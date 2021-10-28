@@ -23,6 +23,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		95210B432729ABBA00428D8F /* LockFreeStack.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LockFreeStack.h; sourceTree = "<group>"; };
+		95210B442729AC0100428D8F /* Mutex.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Mutex.h; sourceTree = "<group>"; };
+		95210B452729AC4B00428D8F /* Shared.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Shared.h; sourceTree = "<group>"; };
 		953FEB2C26F8C5BD00EBF51A /* LockFreeTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LockFreeTest; sourceTree = BUILT_PRODUCTS_DIR; };
 		953FEB2E26F8C5BD00EBF51A /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -38,6 +41,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		9526595D272670DA007392D9 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				9526595E2726724F007392D9 /* LockFree */,
+				95210B452729AC4B00428D8F /* Shared.h */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		9526595E2726724F007392D9 /* LockFree */ = {
+			isa = PBXGroup;
+			children = (
+				95210B432729ABBA00428D8F /* LockFreeStack.h */,
+				95210B442729AC0100428D8F /* Mutex.h */,
+			);
+			path = LockFree;
+			sourceTree = "<group>";
+		};
 		953FEB2D26F8C5BD00EBF51A /* LockFreeTest */ = {
 			isa = PBXGroup;
 			children = (
@@ -49,6 +70,7 @@
 		958AC37226E51DA9006D74A4 = {
 			isa = PBXGroup;
 			children = (
+				9526595D272670DA007392D9 /* Shared */,
 				953FEB2D26F8C5BD00EBF51A /* LockFreeTest */,
 				958AC37C26E51DA9006D74A4 /* Products */,
 			);
@@ -89,7 +111,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 1300;
+				LastUpgradeCheck = 1310;
 				TargetAttributes = {
 					953FEB2B26F8C5BD00EBF51A = {
 						CreatedOnToolsVersion = 13.0;
@@ -129,6 +151,7 @@
 		953FEB3026F8C5BD00EBF51A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = EQPSU577A8;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -139,6 +162,7 @@
 		953FEB3126F8C5BD00EBF51A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = EQPSU577A8;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -152,7 +176,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -211,7 +235,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;

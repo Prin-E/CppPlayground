@@ -1,21 +1,6 @@
 #include <iostream>
-#include <atomic>
 #include <thread>
-
-// spinlock mutex using atomic flag
-class spinlock_mutex {
-public:
-    void lock() {
-        while(flag.test_and_set(std::memory_order_acquire));
-    }
-    
-    void unlock() {
-        flag.clear(std::memory_order_release);
-    }
-    
-private:
-    std::atomic_flag flag = ATOMIC_FLAG_INIT;
-};
+#include "../Shared/Shared.h"
 
 // global variables
 spinlock_mutex global_mutex;
@@ -24,7 +9,7 @@ std::atomic<int> global_intval{0};
 // thread main
 void atomic_flag_thread_main() {
     global_mutex.lock();
-    int val = global_intval.fetch_add(1, std::memory_order_relaxed) + 1;
+    volatile int val = global_intval.fetch_add(1, std::memory_order_relaxed) + 1;
     std::cout << "Called from thread! (counter:" << val << ")" << std::endl;
     global_mutex.unlock();
 }

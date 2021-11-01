@@ -89,7 +89,7 @@ public:
             n->next = head.load(std::memory_order_relaxed);
             link.counter = n->next.counter + 1;
         }
-        while(!head.compare_exchange_weak(n->next, link, std::memory_order_relaxed));
+        while(!head.compare_exchange_weak(n->next, link));
     }
 
     bool pop(T &out_value) {
@@ -106,7 +106,7 @@ public:
             next_link = node->next;
             next_link.counter = link.counter + 1;
         }
-        while(!head.compare_exchange_weak(link, next_link, std::memory_order_relaxed));
+        while(!head.compare_exchange_weak(link, next_link));
         
         out_value = std::move(node->value);
         deferred_delete(node);
@@ -115,7 +115,7 @@ public:
     
     // debug-only fetch function (not thread-safe)
     void debug_fetch(T *values, uintptr_t *counters, size_t length) {
-        node_link_t link = head.load(std::memory_order_seq_cst);
+        node_link_t link = head.load();
         int index = 0;
         while(link.ptr != 0) {
             values[index] = ((node_t*)link.ptr)->value;
@@ -127,7 +127,7 @@ public:
     
 private:
     void deferred_delete(node_t *node) {
-        if(pop_count.fetch_add(-1, std::memory_order_seq_cst) == 1) {
+        if(pop_count.fetch_add(-1) == 1) {
             // delete the node immediately (+deferred list)
             node_link_t delete_link, empty_link;
             delete_link = delete_list.exchange(empty_link);
@@ -138,7 +138,7 @@ private:
             // push the node into deferred list
             node_link_t prev_delete_link, new_delete_link;
             do {
-                prev_delete_link = delete_list.load(std::memory_order_seq_cst);
+                prev_delete_link = delete_list.load(std::memory_order_relaxed);
                 node->next = prev_delete_link;
                 new_delete_link.ptr = (uintptr_t)node;
             }

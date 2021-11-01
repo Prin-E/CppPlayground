@@ -102,12 +102,14 @@ int main(int argc, const char * argv[]) {
             
             std::cout << "--------------------------------" << std::endl;
             std::cout << "Complete!" << std::endl << std::endl;
+            
+            STAT_ALIVE_NODE_COUNT;
         }
         
         // multi threaded test (push validation)
         {
             std::cout << "Multi-threaded push test..." << std::endl;
-            constexpr int num_push_threads = 16;
+            constexpr int num_push_threads = 32;
             constexpr int num_push_iteration = 1000;
             int push_value_log[num_push_threads][num_push_iteration];
             int stack_values[num_push_threads * num_push_iteration];
@@ -125,6 +127,7 @@ int main(int argc, const char * argv[]) {
             std::cout << "--------------------------------" << std::endl;
             
             // validate pushed values
+            std::cout << "Validating..." << std::endl;
             std::vector<int> push_vec, stack_values_vec;
             std::vector<uintptr_t> stack_counters_vec;
             for(int i = 0; i < num_push_threads; i++) {
@@ -148,11 +151,17 @@ int main(int argc, const char * argv[]) {
             }
             
             if(validation_flag)
-                std::cout << "Validation success! --- " << std::endl;
+                std::cout << "Validation success!" << std::endl;
             else
-                std::cout << "Validation failed! --- " << std::endl;
+                std::cout << "Validation failed!" << std::endl;
             
             std::cout << "Complete!" << std::endl << std::endl;
+            
+            // pops all nodes in stack
+            int dummy_val;
+            while(stack.pop(dummy_val)) {}
+            
+            STAT_ALIVE_NODE_COUNT;
         }
         
         // multi threaded test (push-pop validation)
@@ -160,8 +169,8 @@ int main(int argc, const char * argv[]) {
             std::cout << "Multi-threaded push and pop test..." << std::endl;
             constexpr int num_push_threads = 1000;
             constexpr int num_pop_threads = 1000;
-            constexpr int num_push_iteration = 100000;
-            constexpr int num_pop_iteration = 100000;
+            constexpr int num_push_iteration = 2000000;
+            constexpr int num_pop_iteration = 2000000;
             static_assert(num_push_threads * num_push_iteration == num_pop_threads * num_pop_iteration, "push and pop count are mismatch!");
             
             int *push_value_log[num_push_threads];
@@ -173,7 +182,9 @@ int main(int argc, const char * argv[]) {
                 pop_value_log[i] = new int[num_pop_iteration];
             }
             
-            std::cout << "Running " << (num_push_threads + num_pop_threads) << " threads... (iteration:" << num_push_iteration << "," << num_pop_iteration << ")" << std::endl;
+            std::cout << "Running " << (num_push_threads + num_pop_threads) << " threads... (iteration:push(" << num_push_iteration << "),pop(" << num_pop_iteration << "))" << std::endl;
+            
+            std::chrono::time_point time_begin = std::chrono::system_clock::now();
             
             std::thread ts_push[num_push_threads];
             std::thread ts_pop[num_pop_threads];
@@ -191,7 +202,12 @@ int main(int argc, const char * argv[]) {
             }
             std::cout << "--------------------------------" << std::endl;
             
+            std::chrono::time_point time_to = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed = (time_to - time_begin);
+            std::cout << "Elapsed : " << elapsed.count() << " sec" << std::endl;
+            
             // validate push-pop values
+            std::cout << "Validating..." << std::endl;
             std::vector<int> push_vec, pop_vec;
             for(int i = 0; i < num_push_threads; i++) {
                 for(int j = 0; j < num_push_iteration; j++)
@@ -205,10 +221,10 @@ int main(int argc, const char * argv[]) {
             std::sort(pop_vec.begin(), pop_vec.end());
             
             if(push_vec == pop_vec) {
-                std::cout << "Validation success! --- " << std::endl;
+                std::cout << "Validation success!" << std::endl;
             }
             else {
-                std::cout << "Validation failed! --- " << std::endl;
+                std::cout << "Validation failed!" << std::endl;
             }
             
             for(int i = 0; i < num_push_threads; i++) {
@@ -217,7 +233,10 @@ int main(int argc, const char * argv[]) {
             for(int i = 0; i < num_pop_threads; i++) {
                 delete pop_value_log[i];
             }
+            
             std::cout << "Complete!" << std::endl << std::endl;
+            
+            STAT_ALIVE_NODE_COUNT;
         }
         
         // multi threaded test (stress)

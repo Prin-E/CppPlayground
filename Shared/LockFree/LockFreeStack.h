@@ -12,6 +12,26 @@
 #include <memory>
 #include <utility>
 
+// for checking memory leaks of nodes...
+#ifndef DEBUG_ALIVE_NODE_COUNT
+#define DEBUG_ALIVE_NODE_COUNT 0
+#endif
+
+#if DEBUG_ALIVE_NODE_COUNT
+inline static std::atomic<int32_t> debug_alive_node_count{0};
+#define INC_ALIVE_NODE_COUNT debug_alive_node_count.fetch_add(1, std::memory_order_relaxed)
+#define DEC_ALIVE_NODE_COUNT debug_alive_node_count.fetch_add(-1, std::memory_order_relaxed)
+#define STAT_ALIVE_NODE_COUNT \
+{\
+int32_t val = debug_alive_node_count.load(std::memory_order_seq_cst);\
+std::cout << "active node count is " << val << std::endl;\
+}
+#else
+#define INC_ALIVE_NODE_COUNT
+#define DEC_ALIVE_NODE_COUNT
+#define STAT_ALIVE_NODE_COUNT
+#endif
+
 // Linked list node
 template<typename T>
 struct linked_list_node {
@@ -39,9 +59,10 @@ struct linked_list_node {
     //struct linked_list_node *next;
     T value;
     
-    linked_list_node() {}
-    linked_list_node(const T &v) : value(v) {}
-    linked_list_node(T &&v) : value(std::move(v)) {}
+    linked_list_node() { INC_ALIVE_NODE_COUNT; }
+    linked_list_node(const T &v) : value(v) { INC_ALIVE_NODE_COUNT; }
+    linked_list_node(T &&v) : value(std::move(v)) { INC_ALIVE_NODE_COUNT; }
+    ~linked_list_node() { DEC_ALIVE_NODE_COUNT; }
 };
 
 // Lock-free stack
@@ -68,29 +89,28 @@ public:
             n->next = head.load(std::memory_order_relaxed);
             link.counter = n->next.counter + 1;
         }
-        while(!head.compare_exchange_strong(n->next, link));
+        while(!head.compare_exchange_weak(n->next, link, std::memory_order_relaxed));
     }
 
     bool pop(T &out_value) {
         node_link_t link, next_link;
         node_t *node = nullptr;
+        pop_count.fetch_add(1, std::memory_order_relaxed);
         do {
-            link = head.load();
+            link = head.load(std::memory_order_relaxed);
             node = (node_t*)link.ptr;
-            std::atomic_thread_fence(std::memory_order_seq_cst);
-            if(node == nullptr)
-                break;
+            if(node == nullptr) {
+                pop_count.fetch_add(-1, std::memory_order_relaxed);
+                return false;
+            }
             next_link = node->next;
             next_link.counter = link.counter + 1;
         }
-        while(!head.compare_exchange_weak(link, next_link));
+        while(!head.compare_exchange_weak(link, next_link, std::memory_order_relaxed));
         
-        bool flag = node != nullptr;
-        if(flag) {
-            out_value = std::move(node->value);
-            delete node;
-        }
-        return flag;
+        out_value = std::move(node->value);
+        deferred_delete(node);
+        return true;
     }
     
     // debug-only fetch function (not thread-safe)
@@ -106,7 +126,38 @@ public:
     }
     
 private:
+    void deferred_delete(node_t *node) {
+        if(pop_count.fetch_add(-1, std::memory_order_seq_cst) == 1) {
+            // delete the node immediately (+deferred list)
+            node_link_t delete_link, empty_link;
+            delete_link = delete_list.exchange(empty_link);
+            delete_nodes_in_link(delete_link);
+            delete node;
+        }
+        else {
+            // push the node into deferred list
+            node_link_t prev_delete_link, new_delete_link;
+            do {
+                prev_delete_link = delete_list.load(std::memory_order_seq_cst);
+                node->next = prev_delete_link;
+                new_delete_link.ptr = (uintptr_t)node;
+            }
+            while(!delete_list.compare_exchange_weak(prev_delete_link, new_delete_link));
+        }
+    }
+    
+    void delete_nodes_in_link(node_link_t delete_link) {
+        while(delete_link.ptr != 0) {
+            node_t *node = (node_t*)delete_link.ptr;
+            delete_link = node->next;
+            delete node;
+        }
+    }
+    
+private:
     std::atomic<node_link_t> head;
+    std::atomic<node_link_t> delete_list;
+    std::atomic<int> pop_count;
 };
 
 // default types

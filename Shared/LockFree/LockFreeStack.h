@@ -12,6 +12,8 @@
 #include <memory>
 #include <utility>
 
+#include "../Memory/MemoryPool.h"
+
 // for checking memory leaks of nodes...
 #ifndef DEBUG_ALIVE_NODE_COUNT
 #define DEBUG_ALIVE_NODE_COUNT 0

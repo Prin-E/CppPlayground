@@ -10,6 +10,17 @@
 
 #include <atomic>
 
+// scoped lock
+template<typename mutex_t>
+class scoped_lock {
+public:
+    scoped_lock() { mutex.lock(); }
+    ~scoped_lock() { mutex.unlock(); }
+    
+private:
+    mutex_t mutex;
+};
+
 // spinlock mutex using atomic flag
 class spinlock_mutex {
 public:

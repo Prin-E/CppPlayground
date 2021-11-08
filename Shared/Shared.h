@@ -8,6 +8,7 @@
 #ifndef Shared_h
 #define Shared_h
 
+#include "Memory/MemoryPool.h"
 #include "LockFree/LockFreeStack.h"
 #include "LockFree/Mutex.h"
 

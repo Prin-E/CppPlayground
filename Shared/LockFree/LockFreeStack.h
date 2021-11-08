@@ -84,7 +84,7 @@ public:
     }
     
     void push(const T &value) {
-        node_t *n = new node_t(value);
+        node_t *n = new (global_memory_pool.allocate()) node_t(value);
         node_link_t link;
         link.ptr = (uintptr_t)n;
         do {
@@ -134,7 +134,8 @@ private:
             node_link_t delete_link, empty_link;
             delete_link = delete_list.exchange(empty_link);
             delete_nodes_in_link(delete_link);
-            delete node;
+            node->~node_t();
+            global_memory_pool.free(node);
         }
         else {
             // push the node into deferred list
@@ -152,7 +153,8 @@ private:
         while(delete_link.ptr != 0) {
             node_t *node = (node_t*)delete_link.ptr;
             delete_link = node->next;
-            delete node;
+            node->~node_t();
+            global_memory_pool.free(node);
         }
     }
     

@@ -8,6 +8,7 @@
 #ifndef MemoryPool_h
 #define MemoryPool_h
 
+#include <cstdlib>
 #include "../LockFree/Mutex.h"
 
 constexpr size_t PAGE_SIZE_16KB = 16 * 1024;
@@ -26,15 +27,142 @@ public:
     memory_pool() {}
     ~memory_pool() {}
     
-    void* allocate() {
-        // todo
+    void *allocate() {
+        void *ptr = nullptr;
+        page *selected_page = nullptr;
+        do
+        {
+            {
+                scoped_lock<spinlock_mutex> lock{ &mutex };
+                for(page &p : pages) {
+                    if(p.is_block_available()) {
+                        selected_page = &p;
+                        break;
+                    }
+                }
+                
+                if(selected_page == nullptr) {
+                    // create a new page
+                    pages.emplace_back(page());
+                    selected_page = &pages.back();
+                }
+            }
+            ptr = selected_page->allocate();
+        }
+        while(ptr == nullptr);
+        return ptr;
     }
     
-    void free(void* ptr) {
-        // todo
+    void free(void *ptr) {
+        page *selected_page = nullptr;
+        {
+            scoped_lock<spinlock_mutex> lock{ &mutex };
+            for(page &p : pages) {
+                if(p.is_block_belong_to_page(ptr)) {
+                    selected_page = &p;
+                    break;
+                }
+            }
+        }
+        if(selected_page != nullptr) {
+            selected_page->free(ptr);
+        }
     }
     
 private:
+    static constexpr size_t num_blocks_in_page = page_size / block_size;
+    static constexpr uintptr_t free_flag = 0xDFD;
+    static constexpr uintptr_t address_shift = 52;
+    static constexpr uintptr_t address_bit = (1ull << address_shift) - 1;
+    
+    class page {
+    public:
+        page() {
+            num_allocated = 0;
+#if WIN32
+            buffer = _aligned_malloc(page_size, page_size);
+#else
+            posix_memalign(&buffer, page_size, page_size);
+#endif
+            std::memset(buffer, 0, page_size);
+            free_block = (block_t*)buffer;
+        }
+        
+        page(page &&other) : num_allocated(other.num_allocated), buffer(other.buffer), free_block(other.free_block) {
+            other.num_allocated = 0;
+            other.buffer = nullptr;
+            other.free_block = nullptr;
+        }
+        
+        ~page() {
+            if(buffer != nullptr)
+                std::free(buffer);
+        }
+        
+        inline bool is_block_available() { return num_allocated < num_blocks_in_page; }
+        
+        inline bool is_block_belong_to_page(void *ptr) {
+            return get_base_address(ptr) == (uintptr_t)buffer;
+        }
+        
+        void *allocate() {
+            scoped_lock<spinlock_mutex> lock{ &mutex };
+            if(!is_block_available())
+                return nullptr;
+            
+            num_allocated++;
+            block_t *b = free_block;
+            if(!is_block_available())
+                free_block = nullptr;
+            else if(free_block->next != 0)
+                free_block = (block_t*)free_block->next;
+            else
+                free_block = (block_t*)((uintptr_t)free_block + block_size);
+            b->value = 0;
+            return b;
+        }
+        
+        void free(void *ptr) {
+            if(ptr == nullptr) return;
+            
+            block_t *b = (block_t*)ptr;
+            uintptr_t base_address = get_base_address((void*)b->next);
+            
+            scoped_lock<spinlock_mutex> lock{ &mutex };
+            if(b->flag == free_flag && (uintptr_t)buffer == base_address) return;
+            assert(num_allocated > 0);
+            
+            b->next = (uintptr_t)free_block & address_bit;
+            b->flag = free_flag;
+            free_block = b;
+            num_allocated--;
+        }
+        
+    private:
+        uintptr_t get_base_address(void *ptr) {
+            uintptr_t value = (uintptr_t)ptr;
+            return value & ~(page_size - 1);
+        }
+        
+    private:
+        struct block_t {
+            union {
+                uintptr_t value;
+                struct {
+                    uintptr_t next : 52;
+                    uintptr_t flag : 12;
+                };
+            };
+        };
+        
+        uint32_t num_allocated;
+        void *buffer;
+        block_t *free_block;
+        spinlock_mutex mutex;
+    };
+    
+    std::vector<page> pages;
+    spinlock_mutex mutex;
     
 private:
     // limitations
@@ -43,6 +171,6 @@ private:
     static_assert(block_size <= page_size, "The page size must be equal or larger than the block size!");
 };
 
-inline memory_pool<64, PAGE_SIZE_16KB>  global_memory_pool;
+inline memory_pool<64, PAGE_SIZE_64KB>  global_memory_pool;
 
 #endif /* MemoryPool_h */

@@ -167,8 +167,8 @@ int main(int argc, const char * argv[]) {
         // multi threaded test (push-pop validation)
         {
             std::cout << "Multi-threaded push and pop test..." << std::endl;
-            constexpr int num_push_threads = 1000;
-            constexpr int num_pop_threads = 1000;
+            constexpr int num_push_threads = 64;
+            constexpr int num_pop_threads = 64;
             constexpr int num_push_iteration = 2000000;
             constexpr int num_pop_iteration = 2000000;
             static_assert(num_push_threads * num_push_iteration == num_pop_threads * num_pop_iteration, "push and pop count are mismatch!");

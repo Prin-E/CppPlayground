@@ -25,11 +25,11 @@ private:
 class spinlock_mutex {
 public:
     void lock() {
-        while(flag.test_and_set(std::memory_order_acquire));
+        while(flag.test_and_set(std::memory_order_seq_cst));
     }
     
     void unlock() {
-        flag.clear(std::memory_order_release);
+        flag.clear(std::memory_order_seq_cst);
     }
     
 private:

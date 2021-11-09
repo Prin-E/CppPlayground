@@ -25,7 +25,14 @@ template<size_t block_size, size_t page_size>
 class memory_pool {
 public:
     memory_pool() {}
-    ~memory_pool() {}
+    ~memory_pool() {
+        scoped_lock<spinlock_mutex> lock{ &mutex };
+        for(size_t i = 0; i < pages.size(); i++) {
+            page *p = pages.at(i);
+            delete p;
+        }
+        pages.clear();
+    }
     
     void *allocate() {
         void *ptr = nullptr;
@@ -34,17 +41,18 @@ public:
         {
             {
                 scoped_lock<spinlock_mutex> lock{ &mutex };
-                for(page &p : pages) {
-                    if(p.is_block_available()) {
-                        selected_page = &p;
+                for(size_t i = 0; i < pages.size(); i++) {
+                    page *p = pages.at(i);
+                    if(p->is_block_available()) {
+                        selected_page = p;
                         break;
                     }
                 }
                 
                 if(selected_page == nullptr) {
                     // create a new page
-                    pages.emplace_back(page());
-                    selected_page = &pages.back();
+                    pages.push_back(new page());
+                    selected_page = pages.back();
                 }
             }
             ptr = selected_page->allocate();
@@ -57,9 +65,9 @@ public:
         page *selected_page = nullptr;
         {
             scoped_lock<spinlock_mutex> lock{ &mutex };
-            for(page &p : pages) {
-                if(p.is_block_belong_to_page(ptr)) {
-                    selected_page = &p;
+            for(page *p : pages) {
+                if(p->is_block_belong_to_page(ptr)) {
+                    selected_page = p;
                     break;
                 }
             }
@@ -110,7 +118,7 @@ private:
             if(!is_block_available())
                 return nullptr;
             
-            num_allocated++;
+            // use the free block
             block_t *b = free_block;
             if(!is_block_available())
                 free_block = nullptr;
@@ -118,6 +126,9 @@ private:
                 free_block = (block_t*)free_block->next;
             else
                 free_block = (block_t*)((uintptr_t)free_block + block_size);
+            num_allocated++;
+            
+            // initialize the value of the block
             b->value = 0;
             return b;
         }
@@ -161,7 +172,7 @@ private:
         spinlock_mutex mutex;
     };
     
-    std::vector<page> pages;
+    std::vector<page*> pages;
     spinlock_mutex mutex;
     
 private:

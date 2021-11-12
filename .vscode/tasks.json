@@ -1,4 +1,17 @@
 {
+    "windows": {
+      "options": {
+        "shell": {
+          "executable": "cmd.exe",
+          "args": [
+            "/C",
+            "for /f \"usebackq delims=#\" %a in (`\"%programfiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere\" -latest -property installationPath`) do \"%a\\Common7\\Tools\\VsDevCmd.bat\"",
+            "-arch=amd64",
+            "&&"
+          ]
+        }
+      }
+    },
     "tasks": [
         {
             "type": "cppbuild",
@@ -18,11 +31,34 @@
             "problemMatcher": [
                 "$gcc"
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
+            "group": "build",
             "detail": "디버거에서 생성된 작업입니다."
+        },
+        {
+            "type": "shell",
+            "label": "C/C++: cl.exe 활성 파일 빌드",
+            "command": "cl.exe",
+            "args": [
+                "/Zi",
+                "/EHsc",
+                "/nologo",
+                "/Fe:",
+                "${fileDirname}\\${fileBasenameNoExtension}.exe",
+                "/Fd:",
+                "${fileDirname}",
+                "/Fo:",
+                "${fileDirname}",
+                "${file}",
+                "/utf-8"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": "build",
+            "detail": "컴파일러: cl.exe"
         }
     ],
     "version": "2.0.0"

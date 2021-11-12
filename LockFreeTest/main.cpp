@@ -184,7 +184,7 @@ int main(int argc, const char * argv[]) {
             
             std::cout << "Running " << (num_push_threads + num_pop_threads) << " threads... (iteration:push(" << num_push_iteration << "),pop(" << num_pop_iteration << "))" << std::endl;
             
-            std::chrono::time_point time_begin = std::chrono::system_clock::now();
+            std::chrono::time_point<std::chrono::system_clock> time_begin = std::chrono::system_clock::now();
             
             std::thread ts_push[num_push_threads];
             std::thread ts_pop[num_pop_threads];
@@ -202,7 +202,7 @@ int main(int argc, const char * argv[]) {
             }
             std::cout << "--------------------------------" << std::endl;
             
-            std::chrono::time_point time_to = std::chrono::system_clock::now();
+            std::chrono::time_point<std::chrono::system_clock> time_to = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed = (time_to - time_begin);
             std::cout << "Elapsed : " << elapsed.count() << " sec" << std::endl;
             

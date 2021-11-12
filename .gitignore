@@ -86,3 +86,9 @@ Temporary Items
 .apdisk
 main
 *.dSYM
+
+# Visual Studio
+*.pdb
+*.ilk
+*.exe
+.vs

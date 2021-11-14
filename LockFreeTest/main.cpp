@@ -167,10 +167,12 @@ int main(int argc, const char * argv[]) {
         // multi threaded test (push-pop validation)
         {
             std::cout << "Multi-threaded push and pop test..." << std::endl;
-            constexpr int num_push_threads = 1000;
-            constexpr int num_pop_threads = 1000;
-            constexpr int num_push_iteration = 2000000;
-            constexpr int num_pop_iteration = 2000000;
+
+            // If we set too many number of threads, IDE hangs on M1. :'(
+            constexpr int num_push_threads = 32;
+            constexpr int num_pop_threads = 32;
+            constexpr int num_push_iteration = 1000000;
+            constexpr int num_pop_iteration = 1000000;
             static_assert(num_push_threads * num_push_iteration == num_pop_threads * num_pop_iteration, "push and pop count are mismatch!");
             
             int *push_value_log[num_push_threads];
@@ -242,8 +244,10 @@ int main(int argc, const char * argv[]) {
         // multi threaded test (stress)
         {
             std::cout << "Multi-threaded stress test..." << std::endl;
-            constexpr int num_push_threads = 250;
-            constexpr int num_pop_threads = 250;
+
+            // If we set too many number of threads, IDE hangs on M1. :'(
+            constexpr int num_push_threads = 32;
+            constexpr int num_pop_threads = 32;
             constexpr int num_iteration = 10000000;
             std::cout << "Running " << (num_push_threads + num_pop_threads) << " threads... (iteration:" << num_iteration << ")" << std::endl;
             

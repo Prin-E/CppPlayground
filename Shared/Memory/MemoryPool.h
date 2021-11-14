@@ -9,6 +9,7 @@
 #define MemoryPool_h
 
 #include <cstdlib>
+#include <cassert>
 #include "../LockFree/Mutex.h"
 
 constexpr size_t PAGE_SIZE_16KB = 16 * 1024;

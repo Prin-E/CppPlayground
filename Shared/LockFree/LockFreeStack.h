@@ -11,14 +11,7 @@
 #include <atomic>
 #include <memory>
 #include <utility>
-
-#ifndef USE_MEMORY_POOL
-#define USE_MEMORY_POOL 1
-#endif
-
-#if USE_MEMORY_POOL
-#include "../Memory/MemoryPool.h"
-#endif
+#include "../../Option/Option.h"
 
 // for checking memory leaks of nodes...
 #ifndef DEBUG_ALIVE_NODE_COUNT

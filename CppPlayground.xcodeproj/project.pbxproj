@@ -28,6 +28,11 @@
 		95210B452729AC4B00428D8F /* Shared.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Shared.h; sourceTree = "<group>"; };
 		953FEB2C26F8C5BD00EBF51A /* LockFreeTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LockFreeTest; sourceTree = BUILT_PRODUCTS_DIR; };
 		953FEB2E26F8C5BD00EBF51A /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		95A9A7332741092D00C3FE0B /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Atomic.h; sourceTree = "<group>"; };
+		95A9A7342741094400C3FE0B /* Platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Platform.h; sourceTree = "<group>"; };
+		95A9A73527410AEF00C3FE0B /* PlatformCommon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PlatformCommon.h; sourceTree = "<group>"; };
+		95A9A738274111C300C3FE0B /* Option.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Option.h; sourceTree = "<group>"; };
+		95A9A73A2741485F00C3FE0B /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Atomic.h; sourceTree = "<group>"; };
 		95B18BAB2737EB41009386F4 /* MemoryPool.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MemoryPool.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -72,6 +77,8 @@
 		958AC37226E51DA9006D74A4 = {
 			isa = PBXGroup;
 			children = (
+				95A9A737274111B900C3FE0B /* Option */,
+				95A9A7302741090800C3FE0B /* Platform */,
 				9526595D272670DA007392D9 /* Shared */,
 				953FEB2D26F8C5BD00EBF51A /* LockFreeTest */,
 				958AC37C26E51DA9006D74A4 /* Products */,
@@ -84,6 +91,41 @@
 				953FEB2C26F8C5BD00EBF51A /* LockFreeTest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		95A9A7302741090800C3FE0B /* Platform */ = {
+			isa = PBXGroup;
+			children = (
+				95A9A7312741091100C3FE0B /* Apple */,
+				95A9A7322741091600C3FE0B /* Windows */,
+				95A9A7342741094400C3FE0B /* Platform.h */,
+				95A9A73527410AEF00C3FE0B /* PlatformCommon.h */,
+			);
+			path = Platform;
+			sourceTree = "<group>";
+		};
+		95A9A7312741091100C3FE0B /* Apple */ = {
+			isa = PBXGroup;
+			children = (
+				95A9A7332741092D00C3FE0B /* Atomic.h */,
+			);
+			path = Apple;
+			sourceTree = "<group>";
+		};
+		95A9A7322741091600C3FE0B /* Windows */ = {
+			isa = PBXGroup;
+			children = (
+				95A9A73A2741485F00C3FE0B /* Atomic.h */,
+			);
+			path = Windows;
+			sourceTree = "<group>";
+		};
+		95A9A737274111B900C3FE0B /* Option */ = {
+			isa = PBXGroup;
+			children = (
+				95A9A738274111C300C3FE0B /* Option.h */,
+			);
+			path = Option;
 			sourceTree = "<group>";
 		};
 		95B18BAA2737EB32009386F4 /* Memory */ = {

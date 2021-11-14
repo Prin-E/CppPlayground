@@ -182,6 +182,6 @@ private:
     static_assert(block_size <= page_size, "The page size must be equal or larger than the block size!");
 };
 
-inline memory_pool<64, PAGE_SIZE_64KB>  global_memory_pool;
+inline memory_pool<128, PAGE_SIZE_2MB>  global_memory_pool;
 
 #endif /* MemoryPool_h */

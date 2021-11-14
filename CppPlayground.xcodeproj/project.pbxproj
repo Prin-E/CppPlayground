@@ -28,6 +28,7 @@
 		95210B452729AC4B00428D8F /* Shared.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Shared.h; sourceTree = "<group>"; };
 		953FEB2C26F8C5BD00EBF51A /* LockFreeTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LockFreeTest; sourceTree = BUILT_PRODUCTS_DIR; };
 		953FEB2E26F8C5BD00EBF51A /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		95B18BAB2737EB41009386F4 /* MemoryPool.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MemoryPool.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +45,7 @@
 		9526595D272670DA007392D9 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				95B18BAA2737EB32009386F4 /* Memory */,
 				9526595E2726724F007392D9 /* LockFree */,
 				95210B452729AC4B00428D8F /* Shared.h */,
 			);
@@ -82,6 +84,14 @@
 				953FEB2C26F8C5BD00EBF51A /* LockFreeTest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		95B18BAA2737EB32009386F4 /* Memory */ = {
+			isa = PBXGroup;
+			children = (
+				95B18BAB2737EB41009386F4 /* MemoryPool.h */,
+			);
+			path = Memory;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

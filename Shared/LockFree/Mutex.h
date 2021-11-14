@@ -10,15 +10,26 @@
 
 #include <atomic>
 
+// scoped lock
+template<typename mutex_t>
+class scoped_lock {
+public:
+    scoped_lock(mutex_t *in_mutex) : mutex(in_mutex) { mutex->lock(); }
+    ~scoped_lock() { mutex->unlock(); }
+    
+private:
+    mutex_t *mutex;
+};
+
 // spinlock mutex using atomic flag
 class spinlock_mutex {
 public:
     void lock() {
-        while(flag.test_and_set(std::memory_order_acquire));
+        while(flag.test_and_set(std::memory_order_seq_cst));
     }
     
     void unlock() {
-        flag.clear(std::memory_order_release);
+        flag.clear(std::memory_order_seq_cst);
     }
     
 private:

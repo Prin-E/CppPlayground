@@ -12,6 +12,14 @@
 #include <memory>
 #include <utility>
 
+#ifndef USE_MEMORY_POOL
+#define USE_MEMORY_POOL 1
+#endif
+
+#if USE_MEMORY_POOL
+#include "../Memory/MemoryPool.h"
+#endif
+
 // for checking memory leaks of nodes...
 #ifndef DEBUG_ALIVE_NODE_COUNT
 #define DEBUG_ALIVE_NODE_COUNT 0
@@ -82,7 +90,11 @@ public:
     }
     
     void push(const T &value) {
+#if USE_MEMORY_POOL
+        node_t *n = new (global_memory_pool.allocate()) node_t(value);
+#else
         node_t *n = new node_t(value);
+#endif
         node_link_t link;
         link.ptr = (uintptr_t)n;
         do {
@@ -132,7 +144,12 @@ private:
             node_link_t delete_link, empty_link;
             delete_link = delete_list.exchange(empty_link);
             delete_nodes_in_link(delete_link);
+#if USE_MEMORY_POOL
+            node->~node_t();
+            global_memory_pool.free(node);
+#else
             delete node;
+#endif
         }
         else {
             // push the node into deferred list
@@ -150,7 +167,12 @@ private:
         while(delete_link.ptr != 0) {
             node_t *node = (node_t*)delete_link.ptr;
             delete_link = node->next;
+#if USE_MEMORY_POOL
+            node->~node_t();
+            global_memory_pool.free(node);
+#else
             delete node;
+#endif
         }
     }
     

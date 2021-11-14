@@ -87,7 +87,7 @@ private:
     public:
         page() {
             num_allocated = 0;
-#if WIN32
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
             buffer = _aligned_malloc(page_size, page_size);
 #else
             posix_memalign(&buffer, page_size, page_size);

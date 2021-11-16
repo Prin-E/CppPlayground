@@ -44,6 +44,7 @@ public:
     ~lf_stack() {
         T val;
         while(pop(val));
+        deferred_delete();
     }
     
     void push(const T &value) {
@@ -73,17 +74,32 @@ public:
             if(prev_head.ptr == 0)
                 return false;
             prev_node = (node_t*)prev_head.ptr;
-            link.ptr = (uintptr_t)prev_node->next;
+            prev_node->internal_count.fetch_add(1);
+            uintptr_t next_ptr = (uintptr_t)prev_node->next;
+            link.ptr = next_ptr;
             link.counter = prev_head.counter + 1;
+            if(head.compare_exchange_strong(prev_head, link)) {
+                break;
+            }
+            else {
+                prev_node->internal_count.fetch_add(-1);
+            }
         }
-        while(!head.compare_exchange_strong(prev_head, link));
+        while(true);
         
         out_value = prev_node->value;
+        if(prev_node->internal_count.fetch_add(-1) == 1) {
 #if USE_MEMORY_POOL
-        global_memory_pool.free(prev_node);
+            global_memory_pool.free(prev_node);
 #else
-        delete prev_node;
+            delete prev_node;
 #endif
+        }
+        else {
+            // other threads are referencing this node. delete it later.
+            add_node_in_deferred_delete_list(prev_node);
+        }
+        deferred_delete();
         return true;
     }
     
@@ -99,12 +115,50 @@ public:
             node = node->next;
         }
     }
+
+private:
+    void deferred_delete() {
+        node_link_t empty_link;
+        node_link_t prev_head = deferred_delete_head.exchange(empty_link);
+        node_t *node = (node_t*)prev_head.ptr;
+        while(node != nullptr) {
+            if(node->internal_count.load() != 0) {
+                // this node is still referenced by other threads. delete it later.
+                add_node_in_deferred_delete_list(node);
+                break;
+            }
+            else {
+                node_t *next_node = node->next;
+#if USE_MEMORY_POOL
+                global_memory_pool.free(node);
+#else
+                delete node;
+#endif
+                node = next_node;
+            }
+        }
+    }
+
+    void add_node_in_deferred_delete_list(void *node) {
+        node_link_t prev_head, link;
+        do {
+            prev_head = deferred_delete_head.load();
+            link.ptr = (uintptr_t)node;
+            ((node_t*)node)->next = (node_t*)prev_head.ptr;
+        }
+        while(!deferred_delete_head.compare_exchange_strong(prev_head, link));
+    }
     
 private:
     // internal node structure
     struct node_t {
         struct node_t *next;
+        std::atomic<int> internal_count;
         T value;
+#if DEBUG_ALIVE_NODE_COUNT
+        node_t() { INC_ALIVE_NODE_COUNT; }
+        ~node_t() { DEC_ALIVE_NODE_COUNT; }
+#endif
     };
     
     // internal node link
@@ -123,6 +177,7 @@ private:
     
     // top head
     std::atomic<node_link_t> head;
+    std::atomic<node_link_t> deferred_delete_head;
 };
 
 // default types

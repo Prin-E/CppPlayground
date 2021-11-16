@@ -43,7 +43,6 @@
                 "/EHsc",
                 "/nologo",
                 "/std:c++17",
-                "/O2",
                 "/Fe:",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
                 "/Fd:",

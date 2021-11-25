@@ -72,7 +72,8 @@ public:
             prev_head = head.load();
             if(prev_head.ptr == 0)
                 return false;
-            prev_node = (node_t*)prev_head.ptr;
+            uintptr_t node_ptr = prev_head.ptr;
+            prev_node = (node_t*)node_ptr;
             link.ptr = (uintptr_t)prev_node->next;
             link.counter = prev_head.counter + 1;
         }

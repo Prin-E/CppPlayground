@@ -6,8 +6,10 @@
 #include "../Shared/Shared.h"
 
 // global variables
-spinlock_mutex global_mutex;
-std::atomic<int> global_intval{0};
+spinlock_mutex global_mutex{4096};
+volatile uint64_t global_intval = 0;
+constexpr const uint64_t num_atomic_flag_repeats = 1000000;
+//std::atomic<int> global_intval{0};
 
 // typedefs
 typedef platform::platform_lf_stack<int> platform_lf_stack_t;
@@ -15,10 +17,13 @@ typedef lf_default_stack lf_stack_t;
 
 // thread main
 void atomic_flag_thread_main() {
-    global_mutex.lock();
-    volatile int val = global_intval.fetch_add(1, std::memory_order_relaxed) + 1;
-    std::cout << "Called from thread! (counter:" << val << ")" << std::endl;
-    global_mutex.unlock();
+    for(int i = 0; i < num_atomic_flag_repeats; i++) {
+        global_mutex.lock();
+        global_intval++;
+        //volatile int val = global_intval.fetch_add(1, std::memory_order_relaxed) + 1;
+        //std::cout << "Called from thread! (counter:" << val << ")" << std::endl;
+        global_mutex.unlock();
+    }
 }
 
 template <typename T>
@@ -62,8 +67,8 @@ bool validate_push_pop(int **push_value_log, int **pop_value_log, int num_push_t
 
 int main(int argc, const char * argv[]) {
     // test flags
-    constexpr bool test_atomic_flag = false;
-    constexpr bool test_lf_stack = true;
+    constexpr bool test_atomic_flag = true;
+    constexpr bool test_lf_stack = false;
     
     // atomic_flag
     if(test_atomic_flag) {
@@ -80,12 +85,20 @@ int main(int argc, const char * argv[]) {
          */
         
         // multiple threads
-        constexpr int num_threads = 8;
-        constexpr int num_iteration = 10;
+        constexpr int num_threads = 4;
+        constexpr int num_iteration = 50;
         std::cout << "Running " << num_threads << " threads... (iteration:" << num_iteration << ")" << std::endl;
+        
+        std::chrono::time_point<std::chrono::system_clock> time_begin, time_to;
+        std::chrono::duration<double> elapsed;
+        double sum_elapsed = 0;
+        
         for(int i = 0; i < num_iteration; i++) {
             std::cout << "--------------------------------" << std::endl;
             std::cout << "- Iteration " << (i + 1) << std::endl;
+            
+            time_begin = std::chrono::system_clock::now();
+            
             std::thread ts[num_threads];
             for(int k = 0; k < num_threads; k++) {
                 ts[k] = std::thread(atomic_flag_thread_main);
@@ -93,8 +106,25 @@ int main(int argc, const char * argv[]) {
             for(int k = 0; k < num_threads; k++) {
                 ts[k].join();
             }
+            
+            time_to = std::chrono::system_clock::now();
+            elapsed = (time_to - time_begin);
+            std::cout << "Elapsed : " << elapsed.count() << " sec" << std::endl;
+            sum_elapsed += elapsed.count();
         }
         std::cout << "--------------------------------" << std::endl;
+        
+        // validate global value
+        std::cout << "Validating..." << std::endl;
+        if(global_intval == num_iteration * num_threads * num_atomic_flag_repeats) {
+            std::cout << "Validation success!" << std::endl;
+        }
+        else {
+            std::cout << "Validation failed!" << std::endl;
+        }
+        
+        sum_elapsed /= num_iteration;
+        std::cout << "Elapsed : " << sum_elapsed << " sec" << std::endl;
         std::cout << "Complete!" << std::endl;
     }
     

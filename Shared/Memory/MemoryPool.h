@@ -174,7 +174,7 @@ private:
     };
     
     std::vector<page*> pages;
-    spinlock_mutex mutex;
+    spinlock_mutex mutex{256};
     
 private:
     // limitations

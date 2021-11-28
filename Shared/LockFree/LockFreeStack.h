@@ -38,7 +38,11 @@ template<typename T>
 class lf_stack {
 public:
     // constructor
-    lf_stack() {}
+    lf_stack() {
+        head = node_link_t();
+        delete_list = node_link_t();
+        pop_count = 0;
+    }
     
     // destructor
     ~lf_stack() {
@@ -79,13 +83,12 @@ public:
         }
         while(!head.compare_exchange_strong(prev_head, link));
         
-        out_value = prev_node->value;
-#if USE_MEMORY_POOL
-        global_memory_pool.free(prev_node);
-#else
-        delete prev_node;
-#endif
-        return true;
+        if(prev_node != nullptr) {
+            out_value = prev_node->value;
+            deferred_delete(prev_node);
+            return true;
+        }
+        return false;
     }
     
     // debug-only fetch function (not thread-safe)
@@ -122,8 +125,50 @@ private:
         node_link_t() : value(0) {}
     };
     
+    void deferred_delete(node_t *node) {
+        if(pop_count.fetch_add(-1) == 1) {
+            // delete the node immediately (+deferred list)
+            node_link_t delete_link, empty_link;
+            delete_link = delete_list.exchange(empty_link);
+            delete_nodes_in_link(delete_link);
+#if USE_MEMORY_POOL
+            node->~node_t();
+            global_memory_pool.free(node);
+#else
+            delete node;
+#endif
+        }
+        else {
+            // push the node into deferred list
+            node_link_t prev_delete_link, new_delete_link;
+            do {
+                prev_delete_link = delete_list.load();
+                new_delete_link.ptr = (uintptr_t)node;
+                node->next = (node_t*)prev_delete_link.ptr;
+                new_delete_link.ptr = (uintptr_t)node;
+            }
+            while(!delete_list.compare_exchange_strong(prev_delete_link, new_delete_link));
+        }
+    }
+    
+    void delete_nodes_in_link(node_link_t delete_link) {
+        node_t *node = (node_t*)delete_link.ptr;
+        while(node != nullptr) {
+#if USE_MEMORY_POOL
+            node->~node_t();
+            global_memory_pool.free(node);
+#else
+            delete node;
+#endif
+            node = node->next;
+        }
+    }
+    
+private:
     // top head
-    std::atomic<node_link_t> head;
+    alignas(64) std::atomic<node_link_t> head;
+    alignas(64) std::atomic<node_link_t> delete_list;
+    alignas(64) std::atomic<uint64_t> pop_count;
 };
 
 // default types

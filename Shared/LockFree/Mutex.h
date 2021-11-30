@@ -16,6 +16,13 @@
 // flag to use x64 BTS assembly in GCC/Clang (12~20% faster than XCHG!)
 #define USE_GCC_ASSEMBLY_X64_BTS (__x86_64__ && __GNUC__)
 
+// flag to use x64 BTS assembly in MSVC (12~20% faster than XCHG!)
+#define USE_MSVC_ASSEMBLY_X64_BTS (_M_X64 && _MSC_VER)
+
+#if USE_MSVC_ASSEMBLY_X64_BTS
+#include <intrin.h>
+#endif
+
 // scoped lock
 template<typename mutex_t>
 class scoped_lock {
@@ -43,6 +50,11 @@ public:
         );
         
         if(ret) {
+#elif USE_MSVC_ASSEMBLY_X64_BTS
+        mutex_try:
+        uint8_t ret = _interlockedbittestandset(&flag, 0);
+        
+        if(ret) {
 #else
         while(flag.test_and_set(std::memory_order_seq_cst)) {
 #endif
@@ -50,7 +62,7 @@ public:
                 std::this_thread::yield();
             }
         
-#if USE_GCC_ASSEMBLY_X64_BTS
+#if USE_GCC_ASSEMBLY_X64_BTS || USE_MSVC_ASSEMBLY_X64_BTS
             goto mutex_try;
 #endif
         }
@@ -62,6 +74,8 @@ public:
             "lock btrl $0, %0\n\t"
             : "+m" (flag)
         );
+#elif USE_MSVC_ASSEMBLY_X64_BTS
+        _InterlockedAnd(&flag, 0);
 #else
         flag.clear(std::memory_order_seq_cst);
 #endif
@@ -70,6 +84,8 @@ public:
 private:
 #if USE_GCC_ASSEMBLY_X64_BTS
     alignas(64) volatile int flag = 0;
+#elif USE_MSVC_ASSEMBLY_X64_BTS
+    alignas(64) volatile long flag = 0;
 #else
     alignas(64) std::atomic_flag flag = ATOMIC_FLAG_INIT;
 #endif

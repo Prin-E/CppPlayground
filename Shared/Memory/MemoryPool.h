@@ -167,14 +167,14 @@ private:
             };
         };
         
+        spinlock_mutex mutex;
         uint32_t num_allocated;
         void *buffer;
         block_t *free_block;
-        spinlock_mutex mutex;
     };
     
+    spinlock_mutex mutex;
     std::vector<page*> pages;
-    spinlock_mutex mutex{256};
     
 private:
     // limitations

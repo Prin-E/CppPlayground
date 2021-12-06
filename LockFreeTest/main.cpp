@@ -12,7 +12,9 @@ constexpr const uint64_t num_atomic_flag_repeats = 1000000;
 //std::atomic<int> global_intval{0};
 
 // typedefs
+#if SUPPORTS_PLATFORM_IMPLEMENTATION
 typedef platform::platform_lf_stack<int> platform_lf_stack_t;
+#endif
 typedef lf_default_stack lf_stack_t;
 
 // thread main
@@ -34,7 +36,9 @@ void lock_free_stack_thread_push_main(T *stack, int thread_index, int num_iterat
         value_log[i] = value;
     }
 }
+#if SUPPORTS_PLATFORM_IMPLEMENTATION
 template void lock_free_stack_thread_push_main<platform_lf_stack_t>(platform_lf_stack_t*, int, int, int*);
+#endif
 template void lock_free_stack_thread_push_main<lf_stack_t>(lf_stack_t*, int, int, int*);
 
 template <typename T>
@@ -45,8 +49,9 @@ void lock_free_stack_thread_pop_main(T *stack, int thread_index, int num_iterati
         value_log[i] = value;
     }
 }
-
+#if SUPPORTS_PLATFORM_IMPLEMENTATION
 template void lock_free_stack_thread_pop_main<platform_lf_stack_t>(platform_lf_stack_t*, int, int, int*);
+#endif
 template void lock_free_stack_thread_pop_main<lf_stack_t>(lf_stack_t*, int, int, int*);
 
 // validation
@@ -130,7 +135,9 @@ int main(int argc, const char * argv[]) {
     
     if(test_lf_stack) {
         lf_stack_t stack;
+#if SUPPORTS_PLATFORM_IMPLEMENTATION
         platform_lf_stack_t platform_stack;
+#endif
         
         // single threaded test
         {
@@ -146,6 +153,7 @@ int main(int argc, const char * argv[]) {
             while(stack.pop(val))
                 std::cout << val << std::endl;
             
+#if SUPPORTS_PLATFORM_IMPLEMENTATION
             // push
             platform_stack.push(3);
             platform_stack.push(4);
@@ -154,7 +162,8 @@ int main(int argc, const char * argv[]) {
             // pop
             while(platform_stack.pop(val))
                 std::cout << val << std::endl;
-            
+#endif
+
             std::cout << "--------------------------------" << std::endl;
             std::cout << "Complete!" << std::endl << std::endl;
             
@@ -244,6 +253,7 @@ int main(int argc, const char * argv[]) {
             std::thread ts_push[num_push_threads];
             std::thread ts_pop[num_pop_threads];
             
+#if SUPPORTS_PLATFORM_IMPLEMENTATION
             /* platform lock-free stack (refernce) */
             std::cout << "(platform) Running " << (num_push_threads + num_pop_threads) << " threads... (iteration:push(" << num_push_iteration << "),pop(" << num_pop_iteration << "))" << std::endl;
             time_begin = std::chrono::system_clock::now();
@@ -274,6 +284,7 @@ int main(int argc, const char * argv[]) {
             else {
                 std::cout << "Validation failed!" << std::endl;
             }
+#endif
             
             /* lock-free stack using std::atomic */
             std::cout << "(std::atomic) Running " << (num_push_threads + num_pop_threads) << " threads... (iteration:push(" << num_push_iteration << "),pop(" << num_pop_iteration << "))" << std::endl;

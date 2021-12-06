@@ -9,6 +9,7 @@
 #define MemoryPool_h
 
 #include <cstdlib>
+#include <cstring>
 #include <cassert>
 #include "../LockFree/Mutex.h"
 

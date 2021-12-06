@@ -29,6 +29,27 @@
           "environment": [],
           "externalConsole": false,
           "preLaunchTask": "C/C++: cl.exe 활성 파일 빌드"
+        },
+        {
+            "name": "gdb - 활성 파일 빌드 및 디버그",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/${fileBasenameNoExtension}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "gdb에 자동 서식 지정 사용",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "C/C++: g++ 활성 파일 빌드",
+            "miDebuggerPath": "/usr/bin/gdb"
         }
     ]
 }

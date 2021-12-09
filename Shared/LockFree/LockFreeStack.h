@@ -41,7 +41,6 @@ public:
     lf_stack() {
         head = node_link_t();
         delete_list = node_link_t();
-        pop_count = 0;
     }
     
     // destructor
@@ -57,38 +56,51 @@ public:
         node_t *n = new node_t();
 #endif
         n->value = value;
+        
         node_link_t link;
-        node_link_t prev_head;
-        do {
-            prev_head = head.load();
-            link.ptr = (uintptr_t)n;
-            link.counter = prev_head.counter + 1;
-            n->next = (node_t*)prev_head.ptr;
-        }
-        while(!head.compare_exchange_strong(prev_head, link));
+        link.ptr = (uintptr_t)n;
+        link.counter = 1;
+        n->next = head.load();
+        while(!head.compare_exchange_strong(n->next, link));
     }
 
     bool pop(T &out_value) {
         node_link_t link;
-        node_link_t prev_head;
-        node_t *prev_node;
-        do {
-            prev_head = head.load();
-            if(prev_head.ptr == 0)
-                return false;
-            uintptr_t node_ptr = prev_head.ptr;
-            prev_node = (node_t*)node_ptr;
-            link.ptr = (uintptr_t)prev_node->next;
-            link.counter = prev_head.counter + 1;
-        }
-        while(!head.compare_exchange_strong(prev_head, link));
+        node_link_t prev_head = head.load();
         
-        if(prev_node != nullptr) {
-            out_value = prev_node->value;
-            deferred_delete(prev_node);
-            return true;
+        for(;;) {
+            do {
+                link = prev_head;
+                link.counter++;
+            }
+            while(!head.compare_exchange_strong(prev_head, link));
+            
+            if(prev_head.ptr == 0) {
+                return false;
+            }
+            node_t *node = (node_t*)link.ptr;
+            if(head.compare_exchange_strong(link, node->next)) {
+                out_value = node->value;
+                int ref_diff = link.counter - 2;
+                if(node->ref_count.fetch_add(ref_diff) == -ref_diff) {
+#if USE_MEMORY_POOL
+                    node->~node_t();
+                    global_memory_pool.free(node);
+#else
+                    delete node;
+#endif
+                }
+                return true;
+            }
+            else if(node->ref_count.fetch_sub(1) == 1) {
+#if USE_MEMORY_POOL
+                node->~node_t();
+                global_memory_pool.free(node);
+#else
+                delete node;
+#endif
+            }
         }
-        return false;
     }
     
     // debug-only fetch function (not thread-safe)
@@ -100,17 +112,11 @@ public:
             values[index] = node->value;
             counters[index] = 0;
             index += 1;
-            node = node->next;
+            node = (node_t*)node->next.ptr;
         }
     }
     
 private:
-    // internal node structure
-    struct node_t {
-        struct node_t *next;
-        T value;
-    };
-    
     // internal node link
     struct node_link_t {
         union {
@@ -125,50 +131,17 @@ private:
         node_link_t() : value(0) {}
     };
     
-    void deferred_delete(node_t *node) {
-        if(pop_count.fetch_add(-1) == 1) {
-            // delete the node immediately (+deferred list)
-            node_link_t delete_link, empty_link;
-            delete_link = delete_list.exchange(empty_link);
-            delete_nodes_in_link(delete_link);
-#if USE_MEMORY_POOL
-            node->~node_t();
-            global_memory_pool.free(node);
-#else
-            delete node;
-#endif
-        }
-        else {
-            // push the node into deferred list
-            node_link_t prev_delete_link, new_delete_link;
-            do {
-                prev_delete_link = delete_list.load();
-                new_delete_link.ptr = (uintptr_t)node;
-                node->next = (node_t*)prev_delete_link.ptr;
-                new_delete_link.ptr = (uintptr_t)node;
-            }
-            while(!delete_list.compare_exchange_strong(prev_delete_link, new_delete_link));
-        }
-    }
-    
-    void delete_nodes_in_link(node_link_t delete_link) {
-        node_t *node = (node_t*)delete_link.ptr;
-        while(node != nullptr) {
-#if USE_MEMORY_POOL
-            node->~node_t();
-            global_memory_pool.free(node);
-#else
-            delete node;
-#endif
-            node = node->next;
-        }
-    }
+    // internal node structure
+    struct node_t {
+        node_link_t next;
+        std::atomic<uint32_t> ref_count;
+        T value;
+    };
     
 private:
     // top head
     alignas(64) std::atomic<node_link_t> head;
     alignas(64) std::atomic<node_link_t> delete_list;
-    alignas(64) std::atomic<uint64_t> pop_count;
 };
 
 // default types

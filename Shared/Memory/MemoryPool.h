@@ -12,6 +12,7 @@
 #include <cstring>
 #include <cassert>
 #include "../LockFree/Mutex.h"
+#include "../Thread/ThreadLocal.h"
 
 constexpr size_t PAGE_SIZE_16KB = 16 * 1024;
 constexpr size_t PAGE_SIZE_32KB = 32 * 1024;
@@ -26,56 +27,34 @@ constexpr size_t PAGE_SIZE_4MB = 4 * 1024 * 1024;
 template<size_t block_size, size_t page_size>
 class memory_pool {
 public:
-    memory_pool() {}
-    ~memory_pool() {
-        scoped_lock<spinlock_mutex> lock{ &mutex };
-        for(size_t i = 0; i < pages.size(); i++) {
-            page *p = pages.at(i);
-            delete p;
+    memory_pool() {
+        uint32_t num_threads_expected = (uint32_t)std::thread::hardware_concurrency();
+        if(num_threads_expected < 4)
+            num_threads_expected = 4;
+        threadlocal_info.reserve(num_threads_expected);
+        for(uint32_t i = 0; i < num_threads_expected; i++) {
+            threadlocal_info_t info;
+            threadlocal_info.push_back(info);
         }
-        pages.clear();
+    }
+    
+    ~memory_pool() {
     }
     
     void *allocate() {
-        void *ptr = nullptr;
-        page *selected_page = nullptr;
-        do
-        {
-            {
-                scoped_lock<spinlock_mutex> lock{ &mutex };
-                for(size_t i = 0; i < pages.size(); i++) {
-                    page *p = pages.at(i);
-                    if(p->is_block_available()) {
-                        selected_page = p;
-                        break;
-                    }
-                }
-                
-                if(selected_page == nullptr) {
-                    // create a new page
-                    pages.push_back(new page());
-                    selected_page = pages.back();
-                }
-            }
-            ptr = selected_page->allocate();
-        }
-        while(ptr == nullptr);
-        return ptr;
+        threadlocal_info_t &threadlocal = get_threadlocal_info(threadlocal_get_thread_id());
+        return threadlocal.allocate();
     }
     
     void free(void *ptr) {
-        page *selected_page = nullptr;
-        {
-            scoped_lock<spinlock_mutex> lock{ &mutex };
-            for(page *p : pages) {
-                if(p->is_block_belong_to_page(ptr)) {
-                    selected_page = p;
-                    break;
-                }
-            }
+        uintptr_t base_address = get_base_address(ptr);
+        page_t *page = (page_t*)base_address;
+        threadlocal_thread_id thread_id = threadlocal_get_thread_id();
+        if(page->thread_id == thread_id) {
+            
         }
-        if(selected_page != nullptr) {
-            selected_page->free(ptr);
+        else {
+            
         }
     }
     
@@ -85,9 +64,9 @@ private:
     static constexpr uintptr_t address_shift = 52;
     static constexpr uintptr_t address_bit = (1ull << address_shift) - 1;
     
-    class page {
+    class page_t {
     public:
-        page() {
+        page_t() {
             num_allocated = 0;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
             buffer = _aligned_malloc(page_size, page_size);
@@ -95,18 +74,7 @@ private:
             posix_memalign(&buffer, page_size, page_size);
 #endif
             std::memset(buffer, 0, page_size);
-            free_block = (block_t*)buffer;
-        }
-        
-        page(page &&other) : num_allocated(other.num_allocated), buffer(other.buffer), free_block(other.free_block) {
-            other.num_allocated = 0;
-            other.buffer = nullptr;
-            other.free_block = nullptr;
-        }
-        
-        ~page() {
-            if(buffer != nullptr)
-                std::free(buffer);
+            thread_id = threadlocal_get_thread_id();
         }
         
         inline bool is_block_available() { return num_allocated < num_blocks_in_page; }
@@ -116,10 +84,6 @@ private:
         }
         
         void *allocate() {
-            scoped_lock<spinlock_mutex> lock{ &mutex };
-            if(!is_block_available())
-                return nullptr;
-            
             // use the free block
             block_t *b = free_block;
             if(!is_block_available())
@@ -148,13 +112,6 @@ private:
             b->next = (uintptr_t)free_block & address_bit;
             b->flag = free_flag;
             free_block = b;
-            num_allocated--;
-        }
-        
-    private:
-        uintptr_t get_base_address(void *ptr) {
-            uintptr_t value = (uintptr_t)ptr;
-            return value & ~(page_size - 1);
         }
         
     private:
@@ -168,14 +125,71 @@ private:
             };
         };
         
-        spinlock_mutex mutex;
+        
+    private:
+        uintptr_t get_base_address(void *ptr) {
+            uintptr_t value = (uintptr_t)ptr;
+            return value & ~(page_size - 1);
+        }
+        
+        void flush_thread_pending_free_list() {
+            block_t *free_list = thread_pending_free_list.exchange(nullptr);
+            while(free_list != nullptr) {
+                block_t *next_block = (block_t*)free_list->next;
+                
+            }
+        }
+        
+        void free_block(block_t *ptr) {
+            
+        }
+        
+    private:
+        struct alignas(64) {
+            threadlocal_thread_id thread_id;
+            void *buffer;
+        };
         uint32_t num_allocated;
-        void *buffer;
-        block_t *free_block;
+        block_t *local_free_list;
+        std::atomic<block_t*> thread_pending_free_list;
     };
     
+    class threadlocal_info_t {
+        std::vector<class page_t*> pages;
+        page_t *available_page;
+        
+        void *allocate() {
+            
+            if(available_page != nullptr) {
+                available_page.allocate();
+            }
+        }
+    };
+    
+    
     spinlock_mutex mutex;
-    std::vector<page*> pages;
+    std::vector<threadlocal_info_t> threadlocal_info;
+    
+private:
+    threadlocal_info_t& get_threadlocal_info(threadlocal_thread_id thread_id) {
+        if(threadlocal_info.size() < thread_id) {
+            
+        }
+        return threadlocal_info.at((size_t)thread_id);
+    }
+    
+    uintptr_t get_base_address(void *ptr) {
+        uintptr_t value = (uintptr_t)ptr;
+        return value & ~(page_size - 1);
+    }
+    
+    page_t *create_new_page() {
+        scoped_lock<spinlock_mutex> lock{ &mutex };
+        void *buffer = aligned_alloc(page_size, page_size);
+        page_t *page = new (buffer) page_t();
+        pages.push_back(page);
+        return page;
+    }
     
 private:
     // limitations
@@ -184,6 +198,6 @@ private:
     static_assert(block_size <= page_size, "The page size must be equal or larger than the block size!");
 };
 
-inline memory_pool<128, PAGE_SIZE_2MB>  global_memory_pool;
+inline memory_pool<64, PAGE_SIZE_512KB> global_memory_pool;
 
 #endif /* MemoryPool_h */

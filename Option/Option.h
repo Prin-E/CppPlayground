@@ -12,8 +12,4 @@
 #define USE_MEMORY_POOL 0
 #endif
 
-#if USE_MEMORY_POOL
-#include "../Shared/Memory/MemoryPool.h"
-#endif
-
 #endif /* Option_h */

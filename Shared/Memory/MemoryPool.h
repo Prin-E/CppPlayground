@@ -68,7 +68,7 @@ public:
 private:
     class page_t {
     public:
-        static constexpr size_t page_header_size = ((sizeof(page_t) + 63) & (~63));
+        static constexpr size_t page_header_size = ((2 * PLATFORM_CACHE_LINE_SIZE + (block_size-1)) & (~(block_size-1)));
         static constexpr size_t allocatable_page_size = page_size - page_header_size;
         static constexpr size_t num_blocks_in_page = allocatable_page_size / block_size;
         
@@ -128,12 +128,12 @@ private:
     private:
         friend class memory_pool;
         
-        struct alignas(128) {
+        struct alignas(PLATFORM_CACHE_LINE_SIZE) {
             threadlocal_thread_id thread_id;
             uint32_t num_allocated;
             block_t *local_free_list;
         };
-        struct alignas(128) {
+        struct alignas(PLATFORM_CACHE_LINE_SIZE) {
             std::atomic<block_t*> thread_pending_free_list;
         };
     };
@@ -181,20 +181,17 @@ private:
                     filled_pages.erase(filled_pages.begin() + i);
                     i--;
                     cnt--;
-                    if(page->num_allocated == 0) {
-                        printf("wow");
-                    }
                 }
             }
         }
         
         page_t *create_new_page() {
             void *buffer;
-            size_t alloc_size = std::max((size_t)2*1024*1024, page_size);
+            constexpr size_t alloc_size = page_size < PAGE_SIZE_2MB ? PAGE_SIZE_2MB : page_size;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
-            buffer = _aligned_malloc(page_size, alloc_size);
+            buffer = _aligned_malloc(alloc_size, alloc_size);
 #else
-            posix_memalign(&buffer, page_size, alloc_size);
+            posix_memalign(&buffer, alloc_size, alloc_size);
 #endif
             std::memset(buffer, 0, alloc_size);
             uint8_t *ptr = (uint8_t*)buffer;
@@ -250,6 +247,6 @@ private:
     static_assert(page_size <= PAGE_SIZE_4MB, "The page size must be equal or smaller than the maximum page size(4MB)!");
 };
 
-inline memory_pool<16, PAGE_SIZE_512KB> global_memory_pool;
+inline memory_pool<64, PAGE_SIZE_512KB> global_memory_pool;
 
 #endif /* MemoryPool_h */

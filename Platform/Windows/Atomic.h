@@ -7,8 +7,13 @@
 
 #pragma once
 
+#include "PlatformDefine.h"
 #include "PlatformCommon.h"
 #include "../../Option/Option.h"
+
+#if USE_MEMORY_POOL
+#include "../../Shared/Memory/MemoryPool.h"
+#endif
 
 NAMESPACE_PLATFORM_BEGIN
 

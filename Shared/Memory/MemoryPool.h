@@ -13,7 +13,7 @@
 #include <cassert>
 #include "../LockFree/Mutex.h"
 #include "../Thread/ThreadLocal.h"
-#include "../../Platform/Platform.h"
+#include "../../Platform/PlatformDefine.h"
 
 constexpr size_t PAGE_SIZE_16KB = 16 * 1024;
 constexpr size_t PAGE_SIZE_32KB = 32 * 1024;

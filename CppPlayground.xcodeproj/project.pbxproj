@@ -29,6 +29,7 @@
 		953FEB2C26F8C5BD00EBF51A /* LockFreeTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LockFreeTest; sourceTree = BUILT_PRODUCTS_DIR; };
 		953FEB2E26F8C5BD00EBF51A /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		955DB3D927626C0A00521B28 /* ThreadLocal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ThreadLocal.h; sourceTree = "<group>"; };
+		95645E0B27691656007631DF /* PlatformDefine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PlatformDefine.h; sourceTree = "<group>"; };
 		95A9A7332741092D00C3FE0B /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Atomic.h; sourceTree = "<group>"; };
 		95A9A7342741094400C3FE0B /* Platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Platform.h; sourceTree = "<group>"; };
 		95A9A73527410AEF00C3FE0B /* PlatformCommon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PlatformCommon.h; sourceTree = "<group>"; };
@@ -110,6 +111,7 @@
 				95A9A7322741091600C3FE0B /* Windows */,
 				95A9A7342741094400C3FE0B /* Platform.h */,
 				95A9A73527410AEF00C3FE0B /* PlatformCommon.h */,
+				95645E0B27691656007631DF /* PlatformDefine.h */,
 			);
 			path = Platform;
 			sourceTree = "<group>";

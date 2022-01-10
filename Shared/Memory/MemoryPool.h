@@ -140,10 +140,15 @@ private:
     
     class threadlocal_info_t {
     public:
-        threadlocal_info_t() : heartbeat(0) {}
+        threadlocal_info_t() : thread_id(0), heartbeat(0) {}
         
         ~threadlocal_info_t() {
             collect();
+        }
+        
+        void initialize(threadlocal_thread_id new_thread_id) {
+            thread_id = new_thread_id;
+            heartbeat = 0;
         }
         
         void *allocate() {
@@ -206,14 +211,40 @@ private:
         std::vector<page_t*> filled_pages;
         std::vector<page_t*> free_pages;
         uint64_t heartbeat;
+        threadlocal_thread_id thread_id;
     };
     
-    spinlock_mutex mutex;
-    inline static thread_local threadlocal_info_t threadlocal_info;
+    class threadlocal_initializer_t {
+    public:
+        threadlocal_initializer_t() : threadlocal_info(nullptr) {
+            scoped_lock<spinlock_mutex> lock{ &memory_pool::mutex };
+            if(free_threadlocal_infos.size() > 0) {
+                threadlocal_info = free_threadlocal_infos.back();
+                free_threadlocal_infos.pop_back();
+            }
+            else {
+                threadlocal_info = new threadlocal_info_t();
+            }
+            threadlocal_info->initialize(threadlocal_get_thread_id());
+        }
+        
+        ~threadlocal_initializer_t() {
+            scoped_lock<spinlock_mutex> lock{ &memory_pool::mutex };
+            free_threadlocal_infos.push_back(threadlocal_info);
+            threadlocal_info = nullptr;
+        }
+        
+        threadlocal_info_t *threadlocal_info;
+    };
+    
+    inline static spinlock_mutex mutex;
+    inline static std::vector<threadlocal_info_t*> free_threadlocal_infos;
+    inline static thread_local threadlocal_initializer_t threadlocal_initializer;
+    //inline static thread_local threadlocal_info_t threadlocal_info;
     
 private:
     threadlocal_info_t& get_threadlocal_info(threadlocal_thread_id thread_id) {
-        return threadlocal_info;
+        return *threadlocal_initializer.threadlocal_info;
         /*
         
         // TODO: remove scoped lock for more performance
@@ -247,6 +278,6 @@ private:
     static_assert(page_size <= PAGE_SIZE_4MB, "The page size must be equal or smaller than the maximum page size(4MB)!");
 };
 
-inline memory_pool<64, PAGE_SIZE_512KB> global_memory_pool;
+inline memory_pool<PLATFORM_CACHE_LINE_SIZE, PAGE_SIZE_512KB> global_memory_pool;
 
 #endif /* MemoryPool_h */

@@ -32,7 +32,7 @@ public:
 public:
     void push(const T &value) {
 #if USE_MEMORY_POOL
-        platform_node_t *n = new (global_memory_pool.allocate()) platform_node_t(value);
+        platform_node_t *n = new (global_memory_pool.allocate(sizeof(platform_node_t))) platform_node_t(value);
 #else
         platform_node_t *n = new platform_node_t(value);
 #endif

@@ -29,24 +29,24 @@ template<size_t block_size, size_t page_size>
 class memory_pool {
 public:
     memory_pool() {
-        /*
+        scoped_lock<spinlock_mutex> lock{ &mutex };
+        
         uint32_t num_threads_expected = (uint32_t)std::thread::hardware_concurrency();
         if(num_threads_expected < 4)
             num_threads_expected = 4;
-        threadlocal_info.reserve(num_threads_expected);
+        free_threadlocal_infos.reserve(num_threads_expected);
         for(uint32_t i = 0; i < num_threads_expected; i++) {
-            threadlocal_info_t info;
-            threadlocal_info.push_back(info);
+            threadlocal_info_t *info = new threadlocal_info_t();
+            free_threadlocal_infos.push_back(info);
         }
-         */
     }
     
     ~memory_pool() {
     }
     
-    void *allocate() {
+    void *allocate(size_t size) {
         threadlocal_info_t &threadlocal = get_threadlocal_info(threadlocal_get_thread_id());
-        return threadlocal.allocate();
+        return threadlocal.allocate(size);
     }
     
     void free(void *ptr) {
@@ -68,14 +68,15 @@ public:
 private:
     class page_t {
     public:
-        static constexpr size_t page_header_size = ((2 * PLATFORM_CACHE_LINE_SIZE + (block_size-1)) & (~(block_size-1)));
-        static constexpr size_t allocatable_page_size = page_size - page_header_size;
-        static constexpr size_t num_blocks_in_page = allocatable_page_size / block_size;
+        //static constexpr size_t page_header_size = ((2 * PLATFORM_CACHE_LINE_SIZE + (block_size-1)) & (~(block_size-1)));
+        //static constexpr size_t allocatable_page_size = page_size - page_header_size;
+        //static constexpr size_t num_blocks_in_page = allocatable_page_size / block_size;
         
-        page_t() {
+        page_t(uint32_t new_page_block_size = PLATFORM_CACHE_LINE_SIZE) : page_block_size(new_page_block_size) {
+            page_header_size = ((2 * PLATFORM_CACHE_LINE_SIZE + (page_block_size-1)) & (~(page_block_size-1)));
+            num_blocks_in_page = (page_size - page_header_size) / page_block_size;
             num_allocated = 0;
             void *buffer = (void*)((uintptr_t)this + page_header_size);
-            //std::memset(buffer, 0, allocatable_page_size);
             thread_id = threadlocal_get_thread_id();
             local_free_list = (block_t*)buffer;
         }
@@ -90,7 +91,7 @@ private:
             else if(local_free_list->next != 0)
                 local_free_list = (block_t*)local_free_list->next;
             else
-                local_free_list = (block_t*)((uintptr_t)local_free_list + block_size);
+                local_free_list = (block_t*)((uintptr_t)local_free_list + page_block_size);
             num_allocated++;
             
             // initialize the value of the block
@@ -130,6 +131,9 @@ private:
         
         struct alignas(PLATFORM_CACHE_LINE_SIZE) {
             threadlocal_thread_id thread_id;
+            uint32_t page_block_size;
+            uint32_t page_header_size;
+            uint32_t num_blocks_in_page;
             uint32_t num_allocated;
             block_t *local_free_list;
         };
@@ -151,46 +155,52 @@ private:
             heartbeat = 0;
         }
         
-        void *allocate() {
+        inline uint32_t get_block_size_index(size_t aligned_size) {
+            return static_cast<uint32_t>((aligned_size >> BLOCK_SIZE_INDEX_SHIFT) - 1);
+        }
+        
+        void *allocate(size_t size) {
             void *ptr = nullptr;
-            page_t *available_page = free_pages.size() > 0 ? free_pages.back() : nullptr;
+            size_t aligned_size = (size + BLOCK_SIZE_ALIGNMENT - 1) & (~(BLOCK_SIZE_ALIGNMENT - 1));
+            uint32_t block_size_index = get_block_size_index(aligned_size);
+            page_t *available_page = free_pages[block_size_index].size() > 0 ? free_pages[block_size_index].back() : nullptr;
             ++heartbeat;
             
             if(available_page == nullptr) {
-                if(heartbeat >= page_t::num_blocks_in_page) {
-                    collect();
-                    if(free_pages.size() > 0)
-                        available_page = free_pages.back();
+                if(heartbeat >= 4096) {
+                    collect(block_size_index);
+                    if(free_pages[block_size_index].size() > 0)
+                        available_page = free_pages[block_size_index].back();
                     else
-                        available_page = create_new_page();
+                        available_page = create_new_page(static_cast<uint32_t>(aligned_size), block_size_index);
                     heartbeat = 0;
                 }
                 else
-                    available_page = create_new_page();
+                    available_page = create_new_page(static_cast<uint32_t>(aligned_size), block_size_index);
             }
             ptr = available_page->allocate();
             if(!available_page->is_block_available()) {
-                free_pages.pop_back();
-                filled_pages.push_back(available_page);
+                free_pages[block_size_index].pop_back();
+                filled_pages[block_size_index].push_back(available_page);
                 available_page = nullptr;
             }
             return ptr;
         }
         
-        void collect() {
-            for(size_t i = 0, cnt = filled_pages.size(); i < cnt; i++) {
-                page_t *page = filled_pages.at(i);
+        void collect(uint32_t block_size_index) {
+            for(size_t i = 0, cnt = filled_pages[block_size_index].size(); i < cnt; i++) {
+                page_t *page = filled_pages[block_size_index].at(i);
                 page->collect();
                 if(page->is_block_available()) {
-                    free_pages.push_back(page);
-                    filled_pages.erase(filled_pages.begin() + i);
+                    free_pages[block_size_index].push_back(page);
+                    filled_pages[block_size_index].erase(filled_pages[block_size_index].begin() + i);
                     i--;
                     cnt--;
                 }
             }
         }
         
-        page_t *create_new_page() {
+        page_t *create_new_page(uint32_t new_block_size, uint32_t block_size_index) {
             void *buffer;
             constexpr size_t alloc_size = page_size < PAGE_SIZE_2MB ? PAGE_SIZE_2MB : page_size;
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
@@ -201,15 +211,15 @@ private:
             std::memset(buffer, 0, alloc_size);
             uint8_t *ptr = (uint8_t*)buffer;
             for(uintptr_t offset = 0; offset < alloc_size; offset += page_size) {
-                page_t *page = new (ptr + offset) page_t();
-                free_pages.push_back(page);
+                page_t *page = new (ptr + offset) page_t(new_block_size);
+                free_pages[block_size_index].push_back(page);
             }
-            return free_pages.back();
+            return free_pages[block_size_index].back();
         }
         
     private:
-        std::vector<page_t*> filled_pages;
-        std::vector<page_t*> free_pages;
+        std::vector<page_t*> filled_pages[NUM_BLOCK_SIZE];
+        std::vector<page_t*> free_pages[NUM_BLOCK_SIZE];
         uint64_t heartbeat;
         threadlocal_thread_id thread_id;
     };
@@ -245,24 +255,7 @@ private:
 private:
     threadlocal_info_t& get_threadlocal_info(threadlocal_thread_id thread_id) {
         return *threadlocal_initializer.threadlocal_info;
-        /*
-        
-        // TODO: remove scoped lock for more performance
-        scoped_lock<spinlock_mutex> lock{ &mutex };
-        if(threadlocal_info.size() < thread_id) {
-            create_new_threadlocal_infos(thread_id - threadlocal_info.size());
-        }
-        return threadlocal_info.at((size_t)thread_id - 1);
-         */
     }
-    
-    /*
-    void create_new_threadlocal_infos(size_t new_info_count) {
-        for(size_t i = 0; i < new_info_count; i++) {
-            threadlocal_info.push_back(threadlocal_info_t());
-        }
-    }
-     */
     
     static uintptr_t get_base_address(void *ptr) {
         uintptr_t value = (uintptr_t)ptr;
@@ -271,13 +264,13 @@ private:
     
 private:
     // limitations
-    static_assert(block_size >= 16, "The block size must be equal or larger than minimum alignment(16)!");
-    static_assert((block_size & (block_size - 1)) == 0, "The block size must be power of 2!");
+    //static_assert(block_size >= 16, "The block size must be equal or larger than minimum alignment(16)!");
+    //static_assert((block_size & (block_size - 1)) == 0, "The block size must be power of 2!");
     static_assert((page_size & (page_size - 1)) == 0, "The page size must be power of 2!");
-    static_assert(block_size <= page_size, "The page size must be equal or larger than the block size!");
+    //static_assert(block_size <= page_size, "The page size must be equal or larger than the block size!");
     static_assert(page_size <= PAGE_SIZE_4MB, "The page size must be equal or smaller than the maximum page size(4MB)!");
 };
 
-inline memory_pool<PLATFORM_CACHE_LINE_SIZE, PAGE_SIZE_512KB> global_memory_pool;
+inline memory_pool<PAGE_SIZE_512KB> global_memory_pool;
 
 #endif /* MemoryPool_h */

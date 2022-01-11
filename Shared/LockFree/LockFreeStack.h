@@ -51,7 +51,7 @@ public:
     
     void push(const T &value) {
 #if USE_MEMORY_POOL
-        node_t *n = new (global_memory_pool.allocate()) node_t();
+        node_t *n = new (global_memory_pool.allocate(sizeof(node_t))) node_t();
 #else
         node_t *n = new node_t();
 #endif

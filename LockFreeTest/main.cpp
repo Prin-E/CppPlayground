@@ -253,7 +253,8 @@ int main(int argc, const char * argv[]) {
             std::thread ts_push[num_push_threads];
             std::thread ts_pop[num_pop_threads];
             
-#if SUPPORTS_PLATFORM_IMPLEMENTATION
+            // TODO: platform_stack is not thread safe currently...
+#if SUPPORTS_PLATFORM_IMPLEMENTATION && 0
             /* platform lock-free stack (refernce) */
             std::cout << "(platform) Running " << (num_push_threads + num_pop_threads) << " threads... (iteration:push(" << num_push_iteration << "),pop(" << num_pop_iteration << "))" << std::endl;
             time_begin = std::chrono::system_clock::now();

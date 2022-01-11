@@ -25,7 +25,14 @@ constexpr size_t PAGE_SIZE_1MB = 1 * 1024 * 1024;
 constexpr size_t PAGE_SIZE_2MB = 2 * 1024 * 1024;
 constexpr size_t PAGE_SIZE_4MB = 4 * 1024 * 1024;
 
-template<size_t block_size, size_t page_size>
+constexpr size_t BLOCK_SIZE_ALIGNMENT = 16;
+constexpr size_t BLOCK_SIZE_LIST[] = {
+    16, 32, 48, 64, 80, 96, 112, 128
+};
+constexpr size_t NUM_BLOCK_SIZE = 8;
+constexpr size_t BLOCK_SIZE_INDEX_SHIFT = 4;
+
+template<size_t page_size>
 class memory_pool {
 public:
     memory_pool() {

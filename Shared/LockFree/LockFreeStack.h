@@ -40,7 +40,6 @@ public:
     // constructor
     lf_stack() {
         head = node_link_t();
-        delete_list = node_link_t();
     }
     
     // destructor
@@ -50,11 +49,7 @@ public:
     }
     
     void push(const T &value) {
-#if USE_MEMORY_POOL
-        node_t *n = new (global_memory_pool.allocate(sizeof(node_t))) node_t();
-#else
-        node_t *n = new node_t();
-#endif
+        node_t *n = new node_t;
         n->value = value;
         
         node_link_t link;
@@ -83,22 +78,12 @@ public:
                 out_value = node->value;
                 int ref_diff = link.counter - 2;
                 if(node->ref_count.fetch_add(ref_diff) == -ref_diff) {
-#if USE_MEMORY_POOL
-                    node->~node_t();
-                    global_memory_pool.free(node);
-#else
                     delete node;
-#endif
                 }
                 return true;
             }
             else if(node->ref_count.fetch_sub(1) == 1) {
-#if USE_MEMORY_POOL
-                node->~node_t();
-                global_memory_pool.free(node);
-#else
                 delete node;
-#endif
             }
         }
     }
@@ -136,12 +121,21 @@ private:
         node_link_t next;
         std::atomic<uint32_t> ref_count;
         T value;
+        
+#if USE_MEMORY_POOL
+        static void *operator new(size_t size) {
+            return global_memory_pool.allocate(size);
+        }
+        
+        static void operator delete(void *ptr) {
+            global_memory_pool.free(ptr);
+        }
+#endif
     };
     
 private:
     // top head
     alignas(64) std::atomic<node_link_t> head;
-    alignas(64) std::atomic<node_link_t> delete_list;
 };
 
 // default types

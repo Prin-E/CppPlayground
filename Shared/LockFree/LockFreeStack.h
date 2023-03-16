@@ -76,7 +76,7 @@ public:
             node_t *node = (node_t*)link.ptr;
             if(head.compare_exchange_strong(link, node->next)) {
                 out_value = node->value;
-                int ref_diff = link.counter - 2;
+                int32_t ref_diff = static_cast<int32_t>(link.counter) - 2;
                 if(node->ref_count.fetch_add(ref_diff) == -ref_diff) {
                     delete node;
                 }
@@ -119,7 +119,7 @@ private:
     // internal node structure
     struct node_t {
         node_link_t next;
-        std::atomic<uint32_t> ref_count;
+        std::atomic<int32_t> ref_count;
         T value;
         
 #if USE_MEMORY_POOL

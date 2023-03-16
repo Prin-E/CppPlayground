@@ -56,26 +56,26 @@ template void lock_free_stack_thread_pop_main<platform_lf_stack_t>(platform_lf_s
 template void lock_free_stack_thread_pop_main<lf_stack_t>(lf_stack_t*, int, int, int*);
 
 template <typename T>
-void lock_free_queue_thread_enqueue_main(T *queue, int thread_index, int num_iteration, int *value_log) {
+void lock_free_queue_thread_push_main(T *queue, int thread_index, int num_iteration, int *value_log) {
     for(int i = 0; i < num_iteration; i++) {
         int value = thread_index * num_iteration + i;
-        queue->enqueue(value);
+        queue->push(value);
         value_log[i] = value;
     }
 }
 
-template void lock_free_queue_thread_enqueue_main<lf_queue_t>(lf_queue_t*, int, int, int*);
+template void lock_free_queue_thread_push_main<lf_queue_t>(lf_queue_t*, int, int, int*);
 
 template <typename T>
-void lock_free_queue_thread_dequeue_main(T *queue, int thread_index, int num_iteration, int *value_log) {
+void lock_free_queue_thread_pop_main(T *queue, int thread_index, int num_iteration, int *value_log) {
     int value = 0;
     for(int i = 0; i < num_iteration; i++) {
-        while(!queue->dequeue(value));
+        while(!queue->pop(value));
         value_log[i] = value;
     }
 }
 
-template void lock_free_queue_thread_dequeue_main<lf_queue_t>(lf_queue_t*, int, int, int*);
+template void lock_free_queue_thread_pop_main<lf_queue_t>(lf_queue_t*, int, int, int*);
 
 // validation
 bool validate_push_pop(int **push_value_log, int **pop_value_log, int num_push_threads, int num_push_iteration, int num_pop_threads, int num_pop_iteration) {
@@ -363,16 +363,16 @@ int main(int argc, const char * argv[]) {
         
         // single threaded test
         {
-            std::cout << "Single-threaded enqeuue and dequeue test..." << std::endl;
+            std::cout << "Single-threaded push and pop test..." << std::endl;
             int val;
             
             // enqueue
-            queue.enqueue(3);
-            queue.enqueue(4);
-            queue.enqueue(2);
+            queue.push(3);
+            queue.push(4);
+            queue.push(2);
             
             // pop
-            while(queue.dequeue(val))
+            while(queue.pop(val))
                 std::cout << val << std::endl;
             
             std::cout << "--------------------------------" << std::endl;
@@ -381,40 +381,58 @@ int main(int argc, const char * argv[]) {
             STAT_ALIVE_NODE_COUNT;
         }
         
-        // single-producer, single-consumer test
+        // multi threaded test (push-pop validation)
         {
-            std::cout << "single-producer enqueue and single-consumer dequeue test..." << std::endl;
-            
+            std::cout << "Multi-threaded push and pop test..." << std::endl;
+
+            // If we set too many number of threads, IDE hangs on M1. :'(
+            constexpr int num_push_threads = 1;
+            constexpr int num_pop_threads = 1;
+            constexpr int num_push_iteration = 10000000;
+            constexpr int num_pop_iteration = 10000000;
             constexpr int num_repeat = 10;
-            constexpr int num_enqueue_iteration = 10'000'000;
-            constexpr int num_dequeue_iteration = 10'000'000;
+            static_assert(num_push_threads * num_push_iteration == num_pop_threads * num_pop_iteration, "push and pop count are mismatch!");
             
-            static_assert(num_enqueue_iteration == num_dequeue_iteration, "enqueue and dequeue count are mismatch!");
-            
-            int *enqueue_value_log = new int[num_enqueue_iteration];
-            int *dequeue_value_log = new int[num_dequeue_iteration];
-            
+            int *push_value_log[num_push_threads];
+            int *pop_value_log[num_pop_threads];
+            for(int i = 0; i < num_push_threads; i++) {
+                push_value_log[i] = new int[num_push_iteration];
+            }
+            for(int i = 0; i < num_pop_threads; i++) {
+                pop_value_log[i] = new int[num_pop_iteration];
+            }
+
             std::chrono::time_point<std::chrono::system_clock> time_begin, time_to;
             std::chrono::duration<double> elapsed;
-            std::thread enqueue_thread, dequeue_thread;
+            std::thread ts_push[num_push_threads];
+            std::thread ts_pop[num_pop_threads];
             
             /* lock-free queue using std::atomic */
-            std::cout << "(std::atomic) Running 2 threads... (repeat:" << num_repeat << "iteration:enqueue(" << num_enqueue_iteration << "),dequeue(" << num_dequeue_iteration << "))" << std::endl;
+            std::cout << "(std::atomic) Running " << (num_push_threads + num_pop_threads) << " threads... (repeat:" << num_repeat << ",iteration:push(" << num_push_iteration << "),pop(" << num_pop_iteration << "))" << std::endl;
             
             for(int repeat = 0; repeat < num_repeat; repeat++) {
                 std::cout << std::endl << "Step #" << repeat+1 << ":" << std::endl;
                 
-                memset(enqueue_value_log, 0, sizeof(num_enqueue_iteration * sizeof(int)));
-                memset(dequeue_value_log, 0, sizeof(num_dequeue_iteration * sizeof(int)));
+                for(int k = 0; k < num_push_threads; k++)
+                    memset(push_value_log[k], 0, sizeof(num_push_iteration * sizeof(int)));
+                for(int k = 0; k < num_pop_threads; k++)
+                    memset(pop_value_log[k], 0, sizeof(num_pop_iteration * sizeof(int)));
                 std::atomic_thread_fence(std::memory_order_seq_cst);
                 
                 time_begin = std::chrono::system_clock::now();
                 
-                enqueue_thread = std::thread(lock_free_queue_thread_enqueue_main<lf_queue_t>, &queue, 0, num_enqueue_iteration, enqueue_value_log);
-                dequeue_thread = std::thread(lock_free_queue_thread_dequeue_main<lf_queue_t>, &queue, 0, num_enqueue_iteration, dequeue_value_log);
-                
-                enqueue_thread.join();
-                dequeue_thread.join();
+                for(int k = 0; k < num_push_threads; k++) {
+                    ts_push[k] = std::thread(lock_free_queue_thread_push_main<lf_queue_t>, &queue, k, num_push_iteration, push_value_log[k]);
+                }
+                for(int k = 0; k < num_pop_threads; k++) {
+                    ts_pop[k] = std::thread(lock_free_queue_thread_pop_main<lf_queue_t>, &queue, k, num_pop_iteration, pop_value_log[k]);
+                }
+                for(int k = 0; k < num_push_threads; k++) {
+                    ts_push[k].join();
+                }
+                for(int k = 0; k < num_pop_threads; k++) {
+                    ts_pop[k].join();
+                }
                 
                 std::cout << "--------------------------------" << std::endl;
                 
@@ -424,7 +442,7 @@ int main(int argc, const char * argv[]) {
                 
                 // validate push-pop values
                 std::cout << "Validating..." << std::endl;
-                if(validate_push_pop(&enqueue_value_log, &dequeue_value_log, 1, num_enqueue_iteration, 1, num_dequeue_iteration)) {
+                if(validate_push_pop(push_value_log, pop_value_log, num_push_threads, num_push_iteration, num_pop_threads, num_pop_iteration)) {
                     std::cout << "Validation success!" << std::endl;
                 }
                 else {
@@ -432,8 +450,12 @@ int main(int argc, const char * argv[]) {
                 }
             }
             
-            delete [] enqueue_value_log;
-            delete [] dequeue_value_log;
+            for(int i = 0; i < num_push_threads; i++) {
+                delete push_value_log[i];
+            }
+            for(int i = 0; i < num_pop_threads; i++) {
+                delete pop_value_log[i];
+            }
             
             std::cout << std::endl;
             std::cout << "Complete!" << std::endl << std::endl;

@@ -16,6 +16,7 @@ constexpr const uint64_t num_atomic_flag_repeats = 1000000;
 typedef platform::platform_lf_stack<int> platform_lf_stack_t;
 #endif
 typedef lf_default_stack lf_stack_t;
+typedef lf_default_queue lf_queue_t;
 
 // thread main
 void atomic_flag_thread_main() {
@@ -54,8 +55,33 @@ template void lock_free_stack_thread_pop_main<platform_lf_stack_t>(platform_lf_s
 #endif
 template void lock_free_stack_thread_pop_main<lf_stack_t>(lf_stack_t*, int, int, int*);
 
+template <typename T>
+void lock_free_queue_thread_enqueue_main(T *queue, int thread_index, int num_iteration, int *value_log) {
+    for(int i = 0; i < num_iteration; i++) {
+        int value = thread_index * num_iteration + i;
+        queue->enqueue(value);
+        value_log[i] = value;
+    }
+}
+
+template void lock_free_queue_thread_enqueue_main<lf_queue_t>(lf_queue_t*, int, int, int*);
+
+template <typename T>
+void lock_free_queue_thread_dequeue_main(T *queue, int thread_index, int num_iteration, int *value_log) {
+    int value = 0;
+    for(int i = 0; i < num_iteration; i++) {
+        while(!queue->dequeue(value));
+        value_log[i] = value;
+    }
+}
+
+template void lock_free_queue_thread_dequeue_main<lf_queue_t>(lf_queue_t*, int, int, int*);
+
 // validation
 bool validate_push_pop(int **push_value_log, int **pop_value_log, int num_push_threads, int num_push_iteration, int num_pop_threads, int num_pop_iteration) {
+    // memory barrier
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    
     std::vector<int> push_vec, pop_vec;
     for(int i = 0; i < num_push_threads; i++) {
         for(int j = 0; j < num_push_iteration; j++)
@@ -72,8 +98,9 @@ bool validate_push_pop(int **push_value_log, int **pop_value_log, int num_push_t
 
 int main(int argc, const char * argv[]) {
     // test flags
-    constexpr bool test_atomic_flag = true;
+    constexpr bool test_atomic_flag = false;
     constexpr bool test_lf_stack = false;
+    constexpr bool test_lf_queue = true;
     
     // atomic_flag
     if(test_atomic_flag) {
@@ -163,7 +190,7 @@ int main(int argc, const char * argv[]) {
             while(platform_stack.pop(val))
                 std::cout << val << std::endl;
 #endif
-
+            
             std::cout << "--------------------------------" << std::endl;
             std::cout << "Complete!" << std::endl << std::endl;
             
@@ -328,6 +355,88 @@ int main(int argc, const char * argv[]) {
             std::cout << "Complete!" << std::endl << std::endl;
             
             STAT_ALIVE_NODE_COUNT;
+        }
+    }
+    
+    if(test_lf_queue) {
+        lf_queue_t queue;
+        
+        // single threaded test
+        {
+            std::cout << "Single-threaded enqeuue and dequeue test..." << std::endl;
+            int val;
+            
+            // enqueue
+            queue.enqueue(3);
+            queue.enqueue(4);
+            queue.enqueue(2);
+            
+            // pop
+            while(queue.dequeue(val))
+                std::cout << val << std::endl;
+            
+            std::cout << "--------------------------------" << std::endl;
+            std::cout << "Complete!" << std::endl << std::endl;
+            
+            STAT_ALIVE_NODE_COUNT;
+        }
+        
+        // single-producer, single-consumer test
+        {
+            std::cout << "single-producer enqueue and single-consumer dequeue test..." << std::endl;
+            
+            constexpr int num_repeat = 10;
+            constexpr int num_enqueue_iteration = 10'000'000;
+            constexpr int num_dequeue_iteration = 10'000'000;
+            
+            static_assert(num_enqueue_iteration == num_dequeue_iteration, "enqueue and dequeue count are mismatch!");
+            
+            int *enqueue_value_log = new int[num_enqueue_iteration];
+            int *dequeue_value_log = new int[num_dequeue_iteration];
+            
+            std::chrono::time_point<std::chrono::system_clock> time_begin, time_to;
+            std::chrono::duration<double> elapsed;
+            std::thread enqueue_thread, dequeue_thread;
+            
+            /* lock-free queue using std::atomic */
+            std::cout << "(std::atomic) Running 2 threads... (repeat:" << num_repeat << "iteration:enqueue(" << num_enqueue_iteration << "),dequeue(" << num_dequeue_iteration << "))" << std::endl;
+            
+            for(int repeat = 0; repeat < num_repeat; repeat++) {
+                std::cout << std::endl << "Step #" << repeat+1 << ":" << std::endl;
+                
+                memset(enqueue_value_log, 0, sizeof(num_enqueue_iteration * sizeof(int)));
+                memset(dequeue_value_log, 0, sizeof(num_dequeue_iteration * sizeof(int)));
+                std::atomic_thread_fence(std::memory_order_seq_cst);
+                
+                time_begin = std::chrono::system_clock::now();
+                
+                enqueue_thread = std::thread(lock_free_queue_thread_enqueue_main<lf_queue_t>, &queue, 0, num_enqueue_iteration, enqueue_value_log);
+                dequeue_thread = std::thread(lock_free_queue_thread_dequeue_main<lf_queue_t>, &queue, 0, num_enqueue_iteration, dequeue_value_log);
+                
+                enqueue_thread.join();
+                dequeue_thread.join();
+                
+                std::cout << "--------------------------------" << std::endl;
+                
+                time_to = std::chrono::system_clock::now();
+                elapsed = (time_to - time_begin);
+                std::cout << "Elapsed : " << elapsed.count() << " sec" << std::endl;
+                
+                // validate push-pop values
+                std::cout << "Validating..." << std::endl;
+                if(validate_push_pop(&enqueue_value_log, &dequeue_value_log, 1, num_enqueue_iteration, 1, num_dequeue_iteration)) {
+                    std::cout << "Validation success!" << std::endl;
+                }
+                else {
+                    std::cout << "Validation failed!" << std::endl;
+                }
+            }
+            
+            delete [] enqueue_value_log;
+            delete [] dequeue_value_log;
+            
+            std::cout << std::endl;
+            std::cout << "Complete!" << std::endl << std::endl;
         }
     }
     

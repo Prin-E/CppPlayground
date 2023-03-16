@@ -36,6 +36,7 @@
 		95A9A738274111C300C3FE0B /* Option.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Option.h; sourceTree = "<group>"; };
 		95A9A73A2741485F00C3FE0B /* Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Atomic.h; sourceTree = "<group>"; };
 		95B18BAB2737EB41009386F4 /* MemoryPool.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MemoryPool.h; sourceTree = "<group>"; };
+		95B4F0C229C228FC0000C5FD /* LockFreeQueue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LockFreeQueue.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				95210B432729ABBA00428D8F /* LockFreeStack.h */,
+				95B4F0C229C228FC0000C5FD /* LockFreeQueue.h */,
 				95210B442729AC0100428D8F /* Mutex.h */,
 			);
 			path = LockFree;
@@ -175,7 +177,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastUpgradeCheck = 1310;
+				LastUpgradeCheck = 1420;
 				TargetAttributes = {
 					953FEB2B26F8C5BD00EBF51A = {
 						CreatedOnToolsVersion = 13.0;
@@ -217,8 +219,10 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = EQPSU577A8;
 				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -228,8 +232,10 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = EQPSU577A8;
 				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -268,6 +274,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -327,6 +334,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

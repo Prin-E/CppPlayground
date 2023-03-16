@@ -10,6 +10,7 @@
 
 #include "Memory/MemoryPool.h"
 #include "LockFree/LockFreeStack.h"
+#include "LockFree/LockFreeQueue.h"
 #include "LockFree/Mutex.h"
 
 #endif /* Shared_h */

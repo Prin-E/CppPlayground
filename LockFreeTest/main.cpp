@@ -386,11 +386,11 @@ int main(int argc, const char * argv[]) {
             std::cout << "Multi-threaded push and pop test..." << std::endl;
 
             // If we set too many number of threads, IDE hangs on M1. :'(
-            constexpr int num_push_threads = 1;
-            constexpr int num_pop_threads = 1;
-            constexpr int num_push_iteration = 10000000;
-            constexpr int num_pop_iteration = 10000000;
-            constexpr int num_repeat = 10;
+            constexpr int num_push_threads = 2;
+            constexpr int num_pop_threads = 2;
+            constexpr int num_push_iteration = 1000000;
+            constexpr int num_pop_iteration = 1000000;
+            constexpr int num_repeat = 100;
             static_assert(num_push_threads * num_push_iteration == num_pop_threads * num_pop_iteration, "push and pop count are mismatch!");
             
             int *push_value_log[num_push_threads];
@@ -448,6 +448,8 @@ int main(int argc, const char * argv[]) {
                 else {
                     std::cout << "Validation failed!" << std::endl;
                 }
+
+                STAT_ALIVE_NODE_COUNT;
             }
             
             for(int i = 0; i < num_push_threads; i++) {

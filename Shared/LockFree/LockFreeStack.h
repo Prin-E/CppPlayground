@@ -13,26 +13,6 @@
 #include <utility>
 #include "../../Option/Option.h"
 
-// for checking memory leaks of nodes...
-#ifndef DEBUG_ALIVE_NODE_COUNT
-#define DEBUG_ALIVE_NODE_COUNT 0
-#endif
-
-#if DEBUG_ALIVE_NODE_COUNT
-inline static std::atomic<int32_t> debug_alive_node_count{0};
-#define INC_ALIVE_NODE_COUNT debug_alive_node_count.fetch_add(1, std::memory_order_relaxed)
-#define DEC_ALIVE_NODE_COUNT debug_alive_node_count.fetch_add(-1, std::memory_order_relaxed)
-#define STAT_ALIVE_NODE_COUNT \
-{\
-int32_t val = debug_alive_node_count.load(std::memory_order_seq_cst);\
-std::cout << "active node count is " << val << std::endl;\
-}
-#else
-#define INC_ALIVE_NODE_COUNT
-#define DEC_ALIVE_NODE_COUNT
-#define STAT_ALIVE_NODE_COUNT
-#endif
-
 // Lock-free stack
 template<typename T>
 class lf_stack {

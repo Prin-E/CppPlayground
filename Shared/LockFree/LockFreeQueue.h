@@ -113,6 +113,7 @@ public:
         node_t *node = new node_t();
         node_link_t node_link;
         node_link.ptr = (uintptr_t)node;
+        node_link.counter = 1;
         head.store(node_link, std::memory_order_release);
         tail.store(node_link, std::memory_order_release);
     }
@@ -149,9 +150,7 @@ public:
                 old_tail->release_counter(2 - static_cast<int32_t>(link.counter), 1);
                 break;
             }
-            else {
-                old_tail->release_counter(1);
-            }
+            old_tail->release_counter(1);
         }
     }
     
@@ -226,6 +225,11 @@ private:
         }
 #endif
 
+#if DEBUG_ALIVE_NODE_COUNT
+        node_t() { INC_ALIVE_NODE_COUNT; }
+        ~node_t() { DEC_ALIVE_NODE_COUNT; }
+#endif
+
         node_counter_t release_counter(int32_t counter, uint32_t external_counters = 0) {
             node_counter_t old_ref_count = ref_count.load(std::memory_order_relaxed);
             node_counter_t new_ref_count;
@@ -234,7 +238,7 @@ private:
                 new_ref_count.counter -= counter;
                 new_ref_count.external_counters -= external_counters;
             }
-            while(ref_count.compare_exchange_strong(old_ref_count, new_ref_count, std::memory_order_acquire, std::memory_order_relaxed));
+            while(!ref_count.compare_exchange_strong(old_ref_count, new_ref_count, std::memory_order_acquire, std::memory_order_relaxed));
             if(new_ref_count.value == 0) {
                 delete this;
             }

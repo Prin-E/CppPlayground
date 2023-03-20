@@ -25,8 +25,8 @@ public:
         node_t *node = new node_t();
         node_link_t node_link;
         node_link.ptr = (uintptr_t)node;
-        head.store(node_link, std::memory_order_release);
-        tail.store(node_link, std::memory_order_release);
+        head = node_link;
+        tail.store(node_link, std::memory_order_relaxed);
     }
     
     ~lf_queue() {
@@ -41,31 +41,39 @@ public:
         node_t *new_tail = new node_t();
         node_link_t new_tail_link;
         new_tail_link.ptr = (uintptr_t)new_tail;
-        new_tail_link.counter = 1;
         
-        node_link_t prev_tail_link = tail.load(std::memory_order_acquire);
+        node_link_t prev_tail_link = tail.load(std::memory_order_relaxed);
         node_t *prev_tail = (node_t*)prev_tail_link.ptr;
         prev_tail->value = value;
         prev_tail->next = new_tail_link;
-        prev_tail->ref_count = 1;
         
         tail.store(new_tail_link, std::memory_order_release);
     }
     
     bool pop(T &out_value) {
-        node_link_t head_link = head.load(std::memory_order_relaxed);
-        node_link_t tail_link = tail.load(std::memory_order_relaxed);
+        node_link_t head_link = head;
+        node_link_t tail_link = tail.load(std::memory_order_acquire);
+        
         if(head_link.ptr != tail_link.ptr) {
             node_t *node = (node_t*)head_link.ptr;
             node_link_t new_head_link = node->next;
-            if(head.compare_exchange_strong(head_link,
-                                            new_head_link,
-                                            std::memory_order_acquire,
-                                            std::memory_order_relaxed)) {
-                out_value = node->value;
-                delete node;
-                return true;
-            }
+            head = new_head_link;
+
+            out_value = node->value;
+            delete node;
+            return true;
+        }
+        return false;
+    }
+
+    bool peek(T &out_value) {
+        node_link_t head_link = head;
+        node_link_t tail_link = tail.load(std::memory_order_acquire);
+        
+        if(head_link.ptr != tail_link.ptr) {
+            node_t *node = (node_t*)head_link.ptr;
+            out_value = node->value;
+            return true;
         }
         return false;
     }
@@ -75,19 +83,13 @@ private:
     struct node_link_t {
         union {
             uintptr_t value;
-            struct {
-                // assumes that the 64-bit system has 52-bit or lower address space.
-                uintptr_t ptr : 52;
-                // counter variable to prevent ABA problem (0~4096)
-                uintptr_t counter : 12;
-            };
+            uintptr_t ptr;
         };
         node_link_t() : value(0) {}
     };
     
     struct node_t {
         node_link_t next;
-        std::atomic<uint32_t> ref_count;
         T value;
         
 #if USE_MEMORY_POOL
@@ -101,7 +103,7 @@ private:
 #endif
     };
     
-    std::atomic<node_link_t> head;
+    node_link_t head;
     std::atomic<node_link_t> tail;
 };
 
@@ -250,6 +252,6 @@ private:
     std::atomic<node_link_t> tail;
 };
 
-typedef lf_queue<int, true> lf_default_queue;
+typedef lf_queue<int, false> lf_default_queue;
 
 #endif /* LockFreeQueue_h */
